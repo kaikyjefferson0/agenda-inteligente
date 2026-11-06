@@ -18,7 +18,7 @@ flowchart LR
 | API | Autenticação, regras de negócio e persistência |
 | PostgreSQL | Dados, garantias de integridade, fila de e-mails e contadores de limite |
 | Worker | Envia os e-mails pendentes, com retentativas |
-| Restauração da demo | Tarefa agendada que recria os dados do negócio demo |
+| Restauração da demo | Tarefa agendada que recria os dados do negócio demo, apagando os dependentes antes, porque as chaves estrangeiras usam `ON DELETE RESTRICT` |
 
 ## Estrutura do repositório
 
@@ -89,7 +89,7 @@ sequenceDiagram
     A-->>C: 201 com o link
     W->>D: Busca pendentes com FOR UPDATE SKIP LOCKED
     W->>E: Envia o e-mail
-    W->>D: Marca como enviado e apaga o payload
+    W->>D: Na mesma escrita, marca como enviado e apaga o payload
 ```
 
 Falhas possíveis:
@@ -103,6 +103,7 @@ Falhas possíveis:
 O padrão outbox grava o e-mail na mesma transação da operação, então nenhum e-mail se perde nem é enviado por uma operação desfeita.
 
 - São até 5 tentativas com espera crescente. Depois disso, a mensagem fica como `failed`, com `last_error`.
+- O worker apaga o `payload` na mesma escrita que muda o status para `sent` ou para `failed`, porque ele pode conter um token bruto. Uma restrição `CHECK` no banco recusa a escrita que não fizer isso.
 - O envio é "pelo menos uma vez". O `id` da mensagem é usado como chave de idempotência, quando o provedor oferece esse recurso.
 - `FOR UPDATE SKIP LOCKED` permite vários workers, sem Redis.
 - O provedor é o Resend, atrás de uma interface que permite trocá-lo. Os testes usam um adaptador falso.
@@ -196,6 +197,8 @@ A escolha final e os preços serão confirmados antes do deploy, porque os plano
 | Cliente | Dados no agendamento | E-mail não verificado não deve associar pessoas | Tabela `customers` |
 | Histórico | Apenas campos de data | Nenhum caso de uso consome eventos | Tabela de eventos |
 | Quem atende | Tabela `professionals` | Separa login de agenda | Campo em `users` |
+| Enums | `text` com `CHECK` e `StrEnum` no código | Acrescentar um valor exige apenas trocar o `CHECK` | Tipos nativos do PostgreSQL |
+| Exclusões | `ON DELETE RESTRICT` em todas as chaves estrangeiras | Serviços e contas são desativados, e nada some em cascata por engano | `CASCADE` |
 | Autenticação | JWT curto e refresh em cookie | Revogável e sem token acessível a scripts | Sessão opaca, `localStorage` |
 | E-mail | Outbox e worker próprio | Não perde mensagens e não exige Redis | `BackgroundTasks`, Celery |
 | Limites | Contadores no PostgreSQL | Valem entre processos, sem novo serviço | Memória, Redis |
