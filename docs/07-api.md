@@ -154,6 +154,52 @@ Nas rotas de administração, os instantes são devolvidos em UTC, e o frontend 
 
 `professional_id` é opcional. Sem ele, a disponibilidade reúne os horários de todos os profissionais aptos, e a criação segue a regra de "sem preferência" (RN10).
 
+Nas rotas públicas, os instantes são devolvidos com o deslocamento do fuso do negócio, e não em UTC. Assim, as duas ocorrências de um horário ambíguo ficam distintas.
+
+Valem para as rotas públicas de negócio:
+
+- Serviço inexistente, inativo ou de outro negócio responde `404`, assim como `slug` inexistente, que não diferencia maiúsculas.
+- Profissional inexistente ou de outro negócio responde `404`. Profissional que não atende o serviço ou com `is_bookable = false` responde `422`.
+- Limites por IP, com contadores separados: 120 por minuto na página e na disponibilidade, e 10 por hora na criação. Toda requisição conta, inclusive repetições, `404` e `422`. A exceção é JSON malformado, recusado antes da contagem.
+
+### Exemplo: página do negócio
+
+```json
+{
+  "name": "Barbearia Demo",
+  "slug": "barbearia-demo",
+  "timezone": "America/Sao_Paulo",
+  "is_demo": true,
+  "min_advance_minutes": 60,
+  "max_advance_days": 30,
+  "services": [
+    {
+      "id": "2c9e7d1a-6b1f-4f7e-9a51-3d8f1b7e4c20",
+      "name": "Corte",
+      "duration_minutes": 30,
+      "price_cents": 5000,
+      "professional_ids": ["5d0c7e42-0000-4000-8000-000000000002"]
+    }
+  ],
+  "professionals": [
+    { "id": "5d0c7e42-0000-4000-8000-000000000002", "name": "Profissional Demo" }
+  ]
+}
+```
+
+`services` traz os serviços ativos, mesmo sem profissional. `professionals` traz os aptos pela RN07, mesmo sem expediente.
+
+### Exemplo: disponibilidade
+
+```json
+{
+  "date": "2026-11-10",
+  "slots": [{ "starts_at": "2026-11-10T09:00:00-03:00" }]
+}
+```
+
+`service_id` e `date` são obrigatórios. Dia fora da antecedência responde `200`, com a lista vazia.
+
 ### Exemplo: criar agendamento
 
 ```http
@@ -186,10 +232,15 @@ Content-Type: application/json
 }
 ```
 
+- `Idempotency-Key` é obrigatória e precisa ser um UUID com hifens, de qualquer versão. Ausente ou inválida, responde `422`.
+- `customer.name` tem de 1 a 120 caracteres, sem caracteres de controle, e `customer.phone` segue o formato E.164, como no exemplo. O frontend converte o que for digitado.
+- `starts_at` fora da grade responde `422 VALIDATION_ERROR`, inclusive na segunda ocorrência de um horário ambíguo. Na grade, mas ocupado, fora do expediente ou da antecedência, responde `409 SLOT_UNAVAILABLE`.
 - `email_status` pode ser `queued` ou `skipped`, quando um limite de envio foi atingido (RN26).
 - Em uma repetição idempotente, a resposta é `200`, com o mesmo agendamento, `access_url: null` e `email_status: "unchanged"` (RN13).
 - Se o limite de e-mail impediu o envio na criação, a repetição responde `200`, com o mesmo agendamento, um novo `access_url` e `email_status: "skipped"`. O link anterior deixa de funcionar, e nenhum e-mail é enfileirado (RN13, RN26).
 - A idempotência garante que o agendamento não é duplicado. A troca do token é um efeito colateral aceito nesse caso.
+- Mesma chave com dados diferentes responde `409 IDEMPOTENCY_KEY_REUSED`. A comparação usa os dados como foram enviados, depois de validados: o mesmo instante com outro deslocamento e o e-mail com outra caixa contam como dados diferentes.
+- A chave só fica registrada quando o agendamento é criado. Depois de uma recusa, ela pode ser usada de novo.
 
 ## Infraestrutura
 

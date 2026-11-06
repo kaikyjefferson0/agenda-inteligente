@@ -1,10 +1,12 @@
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import UTC, datetime, time, timedelta
 from typing import Protocol
 from uuid import UUID
 from zoneinfo import ZoneInfo
+
+ONE_MINUTE = timedelta(minutes=1)
 
 
 class WeeklyInterval(Protocol):
@@ -47,6 +49,28 @@ def has_overlapping_intervals(intervals: Iterable[WeeklyInterval]) -> bool:
     return False
 
 
+def _block_fits_interval(
+    start: datetime, end: datetime, interval: WeeklyInterval, timezone: ZoneInfo
+) -> bool:
+    if not interval.start_time <= start.time() < interval.end_time:
+        return False
+    start_offset, end_offset = start.utcoffset(), end.utcoffset()
+    if start_offset is None or end_offset is None or end_offset >= start_offset:
+        # A clock moving forward passes every time between both ends.
+        return interval.start_time < end.time() <= interval.end_time
+
+    # A clock going back can leave the interval and return, and a block may even
+    # end at the very time the interval starts. Only the walk tells them apart.
+    instant = start.astimezone(UTC) + ONE_MINUTE
+    stop = end.astimezone(UTC)
+    while instant < stop:
+        clock = instant.astimezone(timezone).time()
+        if not interval.start_time <= clock < interval.end_time:
+            return False
+        instant += ONE_MINUTE
+    return True
+
+
 def fits_working_hours(
     starts_at: datetime,
     blocked_until: datetime,
@@ -57,7 +81,8 @@ def fits_working_hours(
 
     The comparison uses the local clock (RN06), because that is how working hours
     are defined. It stays correct across a clock change: nothing happens during
-    skipped hours, and a block in repeated hours is judged by what the clock shows.
+    skipped hours, and in repeated hours the block must stay inside the interval
+    the whole time, not only at both ends.
     """
     start = starts_at.astimezone(timezone)
     end = blocked_until.astimezone(timezone)
@@ -66,8 +91,7 @@ def fits_working_hours(
         return False
     return any(
         interval.weekday == start.weekday()
-        and interval.start_time <= start.time() < interval.end_time
-        and interval.start_time < end.time() <= interval.end_time
+        and _block_fits_interval(start, end, interval, timezone)
         for interval in intervals
     )
 

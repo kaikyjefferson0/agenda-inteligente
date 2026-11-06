@@ -13,6 +13,8 @@ class ErrorCode(StrEnum):
     REGISTRATION_DISABLED = "REGISTRATION_DISABLED"
     DEMO_RESTRICTED = "DEMO_RESTRICTED"
     NOT_FOUND = "NOT_FOUND"
+    SLOT_UNAVAILABLE = "SLOT_UNAVAILABLE"
+    IDEMPOTENCY_KEY_REUSED = "IDEMPOTENCY_KEY_REUSED"
     APPOINTMENT_CONFLICTS = "APPOINTMENT_CONFLICTS"
     TIME_BLOCK_OVERLAP = "TIME_BLOCK_OVERLAP"
     EMAIL_IN_USE = "EMAIL_IN_USE"
@@ -34,6 +36,7 @@ class AppError(Exception):
         retry_after: int | None = None,
         conflicts: Sequence[AppointmentSummary] | None = None,
         invalid_field: tuple[str, str] | None = None,
+        invalid_location: str = "body",
     ) -> None:
         super().__init__(code.value)
         self.code = code
@@ -41,3 +44,4 @@ class AppError(Exception):
         self.conflicts = conflicts
         # (field, message), for a rule that needs the stored values to be checked.
         self.invalid_field = invalid_field
+        self.invalid_location = invalid_location

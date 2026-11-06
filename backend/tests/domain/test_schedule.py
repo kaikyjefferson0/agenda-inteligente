@@ -180,6 +180,61 @@ def test_block_leaving_the_interval_in_repeated_hours_does_not_fit() -> None:
     )
 
 
+def test_block_that_leaves_and_returns_in_repeated_hours_does_not_fit() -> None:
+    start = datetime(2030, 11, 3, 5, 15, tzinfo=UTC)
+    # 60 elapsed minutes: the clock shows 01:15 at both ends, but passes 01:59.
+    end = start + timedelta(minutes=60)
+
+    assert start.astimezone(NEW_YORK).time() == end.astimezone(NEW_YORK).time()
+    assert not fits_working_hours(
+        start, end, [interval("01:00", "01:30", FOLD_DAY)], NEW_YORK
+    )
+    assert fits_working_hours(
+        start, end, [interval("01:00", "02:00", FOLD_DAY)], NEW_YORK
+    )
+
+
+def test_block_ending_when_the_clock_goes_back_to_the_interval_start_fits() -> None:
+    start = datetime(2030, 11, 3, 5, 30, tzinfo=UTC)  # The first 01:30.
+    # 30 elapsed minutes: the block ends just as the clock goes back to 01:00.
+    end = start + timedelta(minutes=30)
+
+    assert end.astimezone(NEW_YORK).hour == 1
+    assert end.astimezone(NEW_YORK).minute == 0
+    assert fits_working_hours(
+        start, end, [interval("01:00", "03:00", FOLD_DAY)], NEW_YORK
+    )
+
+
+def test_block_ending_exactly_at_closing_in_the_second_hour_fits() -> None:
+    start = datetime(2030, 11, 3, 5, 30, tzinfo=UTC)  # The first 01:30.
+    # 90 elapsed minutes: the clock ends at 02:00, the second time around 01:xx.
+    end = start + timedelta(minutes=90)
+
+    assert fits_working_hours(
+        start, end, [interval("01:00", "02:00", FOLD_DAY)], NEW_YORK
+    )
+    assert not fits_working_hours(
+        start,
+        end + timedelta(minutes=1),
+        [interval("01:00", "02:00", FOLD_DAY)],
+        NEW_YORK,
+    )
+
+
+def test_block_crossing_into_repeated_hours_must_stay_inside_the_interval() -> None:
+    start = datetime(2030, 11, 3, 4, 30, tzinfo=UTC)  # 00:30, before the change.
+    # 120 elapsed minutes: the clock ends at 01:30, after passing 01:59.
+    end = start + timedelta(minutes=120)
+
+    assert fits_working_hours(
+        start, end, [interval("00:00", "02:00", FOLD_DAY)], NEW_YORK
+    )
+    assert not fits_working_hours(
+        start, end, [interval("00:00", "01:45", FOLD_DAY)], NEW_YORK
+    )
+
+
 def summary(professional_id, start: datetime, end: datetime) -> AppointmentSummary:
     return AppointmentSummary(
         id=uuid4(),
