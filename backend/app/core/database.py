@@ -13,7 +13,11 @@ from app.core.config import get_settings
 
 @lru_cache
 def get_engine() -> AsyncEngine:
-    return create_async_engine(get_settings().database_url, pool_pre_ping=True)
+    # hide_parameters: statements carry password hashes and raw links for the
+    # outbox, and database errors end up in the logs.
+    return create_async_engine(
+        get_settings().database_url, pool_pre_ping=True, hide_parameters=True
+    )
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:

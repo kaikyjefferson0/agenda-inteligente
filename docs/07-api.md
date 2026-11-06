@@ -8,7 +8,7 @@ Este documento define o contrato inicial. Depois da implementação, o OpenAPI g
 - **Negócio:** nas rotas autenticadas, vem da sessão, nunca da URL.
 - **Datas:** ISO 8601 com fuso. Datas sem hora, como em `availability`, são dias locais do negócio.
 - **Autenticação:** `Authorization: Bearer <token>`. O refresh fica em um cookie HttpOnly.
-- **Cookies:** as rotas `/auth/refresh` e `/auth/logout` exigem o cabeçalho `X-Requested-With`, como proteção contra CSRF.
+- **Cookies:** as rotas `/auth/refresh` e `/auth/logout` exigem o cabeçalho `X-Requested-With`, com qualquer valor não vazio, como proteção contra CSRF. Sem ele, respondem `403 FORBIDDEN`, sem tocar no token.
 - **Erros:** seguem a RFC 9457 (`application/problem+json`), com um `code` estável.
 - **Link do cliente:** o token nunca aparece nos logs, e a página usa `Referrer-Policy: no-referrer`.
 
@@ -33,9 +33,15 @@ Exemplo de erro:
 | `POST /auth/refresh` | Renova sessão, com rotação | Cookie | `200` | UC02 |
 | `POST /auth/logout` | Revoga a sessão | Cookie | `204` | UC02 |
 | `GET /auth/me` | Usuário, negócio e papel atuais | Autenticado | `200` | UC02 |
-| `POST /auth/password/forgot` | Solicita recuperação | Público | `202`, sempre | UC03 |
+| `POST /auth/password/forgot` | Solicita recuperação | Público | `202` para qualquer e-mail | UC03 |
 | `POST /auth/password/reset` | Define nova senha | Token | `204` | UC03 |
 | `POST /auth/invitations/accept` | Aceita convite e define senha | Token | `204` | UC04 |
+
+- `register`, `login` e `refresh` devolvem `access_token`, `token_type` e `expires_in`, gravam o refresh em cookie e usam `Cache-Control: no-store`.
+- Acima do limite por IP, `forgot` responde `429`, seja qual for o e-mail, então nada revela se a conta existe. Abaixo dele, responde `202` mesmo quando não enfileira e-mail.
+- `reset` e `invitations/accept` recebem o token no corpo, para que ele não apareça em logs de acesso, e não iniciam sessão.
+- No cadastro, `slug` tem de 3 a 63 caracteres, com letras minúsculas, números e hifens entre eles. `timezone` é um nome IANA, e a senha segue a RN30.
+- Campos desconhecidos são recusados com `422`, inclusive `business_id`.
 
 ## Administração
 
@@ -56,6 +62,10 @@ Exemplo de erro:
 | `GET /professionals/{id}/time-blocks` | Lista bloqueios | Dono ou o próprio | `200` | UC09 |
 | `POST /professionals/{id}/time-blocks` | Cria bloqueio | Dono ou o próprio | `201` | UC09 |
 | `DELETE /time-blocks/{id}` | Remove bloqueio | Dono ou o próprio | `204` | UC09 |
+
+`POST /professionals/invitations` devolve `professional_id`, `email` e `expires_at`, nunca o token. Acima do limite de convites ou de e-mail, responde `429` sem criar nada (RN26).
+
+`POST /professionals/me`, `POST /professionals/{id}/deactivate` e `GET /professionals` fazem parte do contrato, mas ainda não foram implementadas. Estão pendentes para a próxima fase ([UC04](04-casos-de-uso.md#uc04-adicionar-e-desativar-profissionais)).
 
 A resposta de `PUT /professionals/{id}/working-hours` inclui `appointments_outside_hours`, com os agendamentos que ficaram fora do novo expediente (RN22).
 
@@ -132,9 +142,9 @@ Content-Type: application/json
 |---|---|---|
 | `400` | `INVALID_TOKEN` | Convite ou recuperação inválido, expirado ou já usado |
 | `401` | `INVALID_CREDENTIALS` | Login incorreto, conta desativada ou convite não aceito |
-| `401` | `NOT_AUTHENTICATED` | Token de acesso ausente, inválido ou expirado |
+| `401` | `NOT_AUTHENTICATED` | Token de acesso ausente, inválido, expirado ou de sessão revogada |
 | `401` | `INVALID_REFRESH_TOKEN` | Refresh inválido, expirado ou reutilizado |
-| `403` | `FORBIDDEN` | Papel ou agenda sem permissão |
+| `403` | `FORBIDDEN` | Papel ou agenda sem permissão, ou `X-Requested-With` ausente |
 | `403` | `REGISTRATION_DISABLED` | Cadastro desligado |
 | `403` | `DEMO_RESTRICTED` | Operação travada no negócio demo |
 | `404` | `NOT_FOUND` | Inexistente, de outro negócio ou token inválido |
@@ -147,6 +157,8 @@ Content-Type: application/json
 | `409` | `IDEMPOTENCY_KEY_REUSED` | Mesma chave com dados diferentes |
 | `422` | `VALIDATION_ERROR` | Dados inválidos, ou profissional que não atende o serviço |
 | `429` | `RATE_LIMITED` | Limite excedido; inclui `Retry-After` |
+| `4xx` | `HTTP_ERROR` | Erro do protocolo sem código próprio, como método não permitido |
+| `500` | `INTERNAL_ERROR` | Erro inesperado, sem detalhes na resposta |
 | `503` | `DATABASE_UNAVAILABLE` | `GET /health` não conseguiu acessar o banco |
 
 No negócio demo, `POST /auth/password/forgot` continua respondendo `202`, mas não enfileira e-mail.

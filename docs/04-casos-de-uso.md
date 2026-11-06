@@ -6,29 +6,31 @@ As regras citadas estão em [Regras de negócio](03-regras-negocio.md), e os tes
 
 ### UC01. Cadastrar negócio e conta do Dono
 
-- **Ator:** Visitante. **Regras:** RN27.
+- **Ator:** Visitante. **Regras:** RN27, RN30.
 - **Fluxo:** informa dados do negócio e da conta; o sistema cria negócio e Dono em uma única transação, com os padrões de configuração, e inicia a sessão.
 - **Exceções:** cadastro desligado; e-mail ou `slug` já em uso.
 
 ### UC02. Entrar, sair e renovar sessão
 
-- **Atores:** Dono, Profissional.
-- **Fluxo:** informa e-mail e senha; o sistema devolve um token de acesso curto e grava o refresh em um cookie HttpOnly. A sessão é renovada com rotação do refresh e encerrada com sua revogação.
-- **Exceções:** credenciais inválidas, sem indicar qual campo errou; conta desativada; convite não aceito; reuso de refresh, que revoga toda a família de tokens.
+- **Atores:** Dono, Profissional. **Regras:** RN23, RN31.
+- **Fluxo:** informa e-mail e senha; o sistema devolve um token de acesso curto e grava o refresh em um cookie HttpOnly. A sessão é renovada com rotação do refresh e encerrada com sua revogação, que também invalida o token de acesso na hora.
+- **Exceções:** credenciais inválidas, sem indicar qual campo errou; conta desativada; convite não aceito; refresh sem uso por 7 dias ou 30 dias depois do login; reuso de refresh, que revoga toda a família de tokens.
+- **Restrição para o frontend:** a renovação precisa ser única entre abas. Duas chamadas simultâneas com o mesmo refresh são tratadas como reuso e encerram a sessão. Veja a [Arquitetura](08-arquitetura.md#frontend).
 
 ### UC03. Recuperar senha
 
-- **Atores:** Dono, Profissional. **Regras:** RN24, RN28.
-- **Fluxo:** informa o e-mail e recebe um link de uso único; define a nova senha; as sessões existentes são revogadas.
+- **Atores:** Dono, Profissional. **Regras:** RN24, RN26, RN28, RN30.
+- **Fluxo:** informa o e-mail e recebe um link de uso único; define a nova senha; as sessões existentes são revogadas, inclusive os tokens de acesso já emitidos. A V1 não tem troca de senha com o usuário logado: a nova senha sempre passa por este fluxo.
 - **Exceções:** link inválido, expirado ou já usado; a resposta não revela se o e-mail existe.
 
 ### UC04. Adicionar e desativar profissionais
 
-- **Ator:** Dono. **Regras:** RN23, RN24, RN28.
-- **Fluxo de convite:** informa nome e e-mail; o profissional recebe o link, define a senha e passa a poder entrar.
+- **Ator:** Dono. **Regras:** RN23, RN24, RN26, RN28, RN30.
+- **Fluxo de convite:** informa nome e e-mail; o sistema cria a conta pendente e o registro de profissional fora das reservas; o profissional recebe o link, define a senha, passa a poder entrar e entra nas novas reservas. Convidar de novo um e-mail pendente do mesmo negócio renova o link.
 - **Fluxo do Dono:** passa a atender criando o próprio registro de profissional.
 - **Fluxo de desativação:** o sistema confere os agendamentos futuros e desativa.
-- **Exceções:** e-mail já em uso; há agendamentos futuros (`409`, com a lista); convite bloqueado na demo.
+- **Exceções:** e-mail já em uso; há agendamentos futuros (`409`, com a lista); convite bloqueado na demo; limite de convites ou de e-mail (`429`, sem criar nada).
+- **Situação da implementação:** a Fase 3 entregou apenas o fluxo de convite e a perda de acesso de conta desativada. Estão **pendentes para a próxima fase** o fluxo do Dono (`POST /professionals/me`), o fluxo de desativação (`POST /professionals/{id}/deactivate`, com a verificação de agendamentos futuros da RN23 e o CT18) e a listagem (`GET /professionals`).
 
 ## Configuração
 

@@ -202,7 +202,7 @@ Contas de Dono e Profissional. O e-mail é único em todo o sistema, sem diferen
 
 ### `professionals`
 
-Quem atende clientes, em relação 1:1 com `users`. Separa login de agenda: um Dono que não atende não tem registro aqui. `is_bookable` controla a participação em novas reservas e tem padrão `true`.
+Quem atende clientes, em relação 1:1 com `users`. Separa login de agenda: um Dono que não atende não tem registro aqui. `is_bookable` controla a participação em novas reservas e tem padrão `true`. O registro de um convidado nasce no convite, com `is_bookable = false`, e passa a `true` no aceite. Assim, o Dono já pode configurá-lo, mas ninguém reserva com quem ainda não aceitou. O convite pendente é identificado por `users.password_hash` nulo.
 
 - **`UNIQUE`:** `user_id` e `(business_id, id)`.
 
@@ -216,6 +216,8 @@ Links de uso único para convite e recuperação de senha.
 ### `refresh_tokens`
 
 Sessões, com rotação. Cada refresh usado é substituído por outro da mesma `family_id`. Se um token já usado reaparecer, toda a família é revogada.
+
+O menor `created_at` da família marca o login e define o limite absoluto de 30 dias ([RN31](03-regras-negocio.md#contas-e-demo)). Por isso, uma futura limpeza deve apagar famílias inteiras, nunca linhas soltas.
 
 - **Nuláveis:** `used_at` e `revoked_at`.
 - **`UNIQUE`:** `token_hash`.

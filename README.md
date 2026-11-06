@@ -2,7 +2,7 @@
 
 Sistema de agendamento online para negócios de beleza e bem-estar. Projeto de portfólio full stack, com a documentação em [`docs/`](docs/README.md).
 
-**Estado atual:** Fase 2, com a estrutura do projeto e o modelo de dados: 12 tabelas e a primeira migração. Ainda não há rotas de domínio nem regras de negócio na aplicação.
+**Estado atual:** Fase 3, com a autenticação no backend: cadastro do negócio e do Dono, login, logout, renovação de sessão, convite de profissional e recuperação de senha. Os e-mails apenas entram na `email_outbox`, porque o worker ainda não existe. O restante do UC04 (`POST /professionals/me`, desativação e `GET /professionals`) está pendente para a próxima fase. As demais rotas de domínio e o frontend de autenticação virão nas fases seguintes.
 
 ## Pré-requisitos
 
@@ -16,6 +16,8 @@ Para rodar comandos fora dos containers, também são necessários [uv](https://
 cp .env.example .env
 docker compose up --build
 ```
+
+A API não sobe se `JWT_SECRET` ou `RATE_LIMIT_KEY_SECRET` tiverem menos de 32 caracteres. Se o seu `.env` for anterior à autenticação, troque esses dois valores, por exemplo com `openssl rand -hex 32`, e recrie o container da API.
 
 | Serviço | Endereço |
 |---|---|

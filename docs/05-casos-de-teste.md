@@ -77,6 +77,16 @@ O merge é bloqueado abaixo de:
 | CT21 | Link de convite ou recuperação reutilizado ou expirado | Recusado | Integração |
 | CT22 | Excesso de requisições ao agendamento público | `429`, sem novos e-mails | Integração |
 | CT28 | Refresh token reutilizado | Toda a família de tokens é revogada | Integração |
+| CT37 | Login com e-mail inexistente, senha errada, conta desativada ou convite não aceito | Status, corpo e cabeçalhos idênticos, e a senha é verificada nos quatro casos | Integração |
+| CT38 | Duas renovações simultâneas com o mesmo refresh | Apenas uma é aceita, e a família é revogada | Integração |
+| CT39 | Recuperação com e-mail inexistente, conta desativada, convite pendente ou conta válida | Mesma resposta `202`; só a conta válida enfileira e-mail | Integração |
+| CT40 | Redefinição de senha | Todas as sessões são revogadas, inclusive os tokens de acesso já emitidos | Integração |
+| CT41 | Excesso de tentativas de login, todas com falha | `429` com `Retry-After`; a contagem sobrevive ao rollback e não guarda IP nem e-mail em claro | Integração |
+| CT42 | `/auth/refresh` ou `/auth/logout` sem `X-Requested-With` | `403`, sem alterar o token | Integração |
+| CT43 | Refresh sem uso por 7 dias, e sessão em uso até 30 dias depois do login | Recusado nos dois limites exatos; antes deles, a validade desliza até o limite absoluto (RN31) | Unidade e integração |
+| CT44 | Convite e sessão entre negócios: `business_id` enviado, e-mail pendente de outro negócio e token com a família de outro usuário | Negócio vem da sessão; nada é alterado no outro negócio; pedido recusado | Integração |
+| CT45 | Dados inválidos, inclusive senha fora da política | `422` em RFC 9457, sem ecoar a senha | Integração |
+| CT46 | Dois aceites simultâneos do mesmo convite | Apenas um é aceito | Integração |
 
 ### E-mail e demo
 
@@ -103,10 +113,10 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 
 | Caso de uso | Casos de teste |
 |---|---|
-| UC01 | CT26 |
-| UC02 | CT28, E2E02 |
-| UC03 | CT21, CT32 |
-| UC04 | CT18, CT21, CT32 |
+| UC01 | CT26, CT45 |
+| UC02 | CT28, CT37, CT38, CT41, CT42, CT43, E2E02 |
+| UC03 | CT21, CT32, CT39, CT40, CT45 |
+| UC04 | CT18, CT21, CT32, CT44, CT45, CT46 |
 | UC05 | CT19, CT20, CT32 |
 | UC06 | CT10, CT32 |
 | UC07 | CT08 |
