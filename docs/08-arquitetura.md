@@ -68,6 +68,8 @@ Vite, React, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, Reac
 
 O token de acesso fica somente em memória. Ao recarregar a página, o frontend chama `/auth/refresh`.
 
+**A renovação precisa ser única entre abas.** O refresh tem rotação sem tolerância: duas chamadas simultâneas com o mesmo cookie, como ao recarregar duas abas, são tratadas como reuso e revogam a família, o que encerra a sessão. A fase do frontend deve serializar `/auth/refresh` entre abas, por exemplo com a Web Locks API, e reler o resultado obtido pela aba que renovou. Esse requisito é obrigatório para a fase do frontend, porque a API não consegue distinguir essa corrida de um roubo de token.
+
 ## Fluxos críticos
 
 ### Criar agendamento
@@ -112,11 +114,13 @@ O padrão outbox grava o e-mail na mesma transação da operação, então nenhu
 
 ### Autenticação
 
-- **Senhas:** hash com Argon2id.
-- **Token de acesso:** JWT de 15 minutos, mantido em memória.
-- **Refresh:** token opaco de 14 dias, com rotação, guardado como hash e entregue em cookie `HttpOnly`, `Secure`, `SameSite=Strict` e `Path=/api/v1/auth`. O reuso revoga a família inteira.
-- **Conta desativada:** a dependência de autenticação carrega o usuário a cada requisição e confere `is_active`, então a desativação vale imediatamente.
+- **Senhas:** hash com Argon2id, com 64 MiB, 3 passadas e paralelismo 4. O login verifica um hash fictício quando a conta não tem senha, para que o tempo não revele se ela existe.
+- **Token de acesso:** JWT HS256 de 15 minutos, mantido em memória. Contém `sub`, `sid` (a família do refresh), `iss`, `iat` e `exp`, sem `business_id`.
+- **Refresh:** token opaco, com rotação, guardado como hash e entregue em cookie `HttpOnly`, `Secure`, `SameSite=Strict` e `Path=/api/v1/auth`. Expira depois de 7 dias sem uso e, em qualquer caso, 30 dias depois do login ([RN31](03-regras-negocio.md#contas-e-demo)). O reuso revoga a família inteira. O `Secure` não tem opção de desligar; em desenvolvimento, Chrome e Firefox o aceitam em `localhost`.
+- **Revogação imediata:** a dependência de autenticação carrega o usuário a cada requisição, confere `is_active` e exige que a família do `sid` não esteja revogada. Assim, desativação, logout, redefinição de senha e reuso de refresh valem na hora, sem esperar o token de acesso expirar.
+- **Concorrência:** todo fluxo de sessão ou credencial trava primeiro o usuário e depois seus tokens. Duas operações do mesmo usuário ficam em série, sem deadlock, e nenhuma sessão sobrevive a uma redefinição simultânea.
 - **CSRF:** `SameSite=Strict`, cabeçalho `X-Requested-With` nas rotas com cookie e lista fixa de origens em CORS.
+- **Segredos:** `JWT_SECRET` e `RATE_LIMIT_KEY_SECRET` precisam ter ao menos 32 caracteres, ou a aplicação não sobe.
 
 ### Isolamento entre negócios
 
@@ -129,17 +133,25 @@ RLS não é usado na V1. É uma defesa adicional possível, mas exigiria `SET LO
 
 ### Proteção contra abuso
 
-Os limites usam contadores no PostgreSQL e valem entre processos. O IP vem apenas do cabeçalho definido pelo proxy confiável da hospedagem. Valores iniciais, a ajustar com o uso:
+Os limites usam contadores no PostgreSQL, com janelas fixas, e valem entre processos. Cada tentativa é contada em transação própria, para que o rollback de um login falho não apague a contagem. Os limites de e-mail são a exceção: ficam na transação da operação, porque uma operação desfeita não envia nada.
+
+O IP vem apenas do cabeçalho definido em `TRUSTED_CLIENT_IP_HEADER`, usando o valor mais à direita da lista, que é o acrescentado pelo proxy mais próximo. Sem essa variável, vale o endereço da conexão, e cabeçalhos enviados pelo cliente são ignorados. Valores iniciais, a ajustar com o uso:
 
 | Alvo | Limite |
 |---|---|
 | Criar agendamento público | 10 por hora, por IP |
 | Consultar disponibilidade | 120 por minuto, por IP |
 | Rotas com token de cliente | 60 por minuto, por IP |
-| Login | 10 por 15 minutos, por IP e e-mail |
+| Login | 10 por 15 minutos, por combinação de IP e e-mail |
+| Login | 50 por 15 minutos, por IP |
+| Cadastro de negócio | 5 por hora, por IP |
 | Recuperação de senha | 5 por hora, por IP |
-| E-mails por destinatário | 3 por dia |
-| E-mails no total | 100 por dia, a ajustar conforme o plano do provedor |
+| Redefinição de senha e aceite de convite | 10 por hora, por IP, em um único contador |
+| Convites | 20 por hora, por negócio |
+| E-mails por destinatário | 3 por dia UTC |
+| E-mails no total | 100 por dia UTC, a ajustar conforme o plano do provedor |
+
+Refresh e logout não têm limite: o token não é adivinhável, e um `429` em rede compartilhada encerraria sessões legítimas.
 
 O cadastro fechado e as restrições da [RN28](03-regras-negocio.md#contas-e-demo) impedem que a demo envie conteúdo livre a terceiros.
 
@@ -156,13 +168,15 @@ Variáveis principais:
 | Variável | Uso |
 |---|---|
 | `DATABASE_URL` | Conexão com o banco |
-| `JWT_SECRET` | Assinatura do token de acesso |
-| `RATE_LIMIT_KEY_SECRET` | HMAC dos contadores de limite |
+| `JWT_SECRET` | Assinatura do token de acesso, com ao menos 32 caracteres |
+| `RATE_LIMIT_KEY_SECRET` | HMAC dos contadores de limite, com ao menos 32 caracteres |
 | `RESEND_API_KEY` | Envio de e-mails |
 | `EMAIL_BACKEND` | `console`, `fake` ou `resend` |
 | `EMAIL_DAILY_CAP`, `EMAIL_RECIPIENT_DAILY_CAP` | Limites de envio |
 | `REGISTRATION_ENABLED` | Liga o cadastro de negócios |
-| `CORS_ALLOWED_ORIGINS` | Origens permitidas |
+| `CORS_ALLOWED_ORIGINS` | Origens permitidas, separadas por vírgula |
+| `FRONTEND_BASE_URL` | Base dos links enviados por e-mail |
+| `TRUSTED_CLIENT_IP_HEADER` | Cabeçalho com o IP do cliente, definido pelo proxy da hospedagem; vazio sem proxy |
 
 ## CI (GitHub Actions)
 
@@ -200,6 +214,8 @@ A escolha final e os preços serão confirmados antes do deploy, porque os plano
 | Enums | `text` com `CHECK` e `StrEnum` no código | Acrescentar um valor exige apenas trocar o `CHECK` | Tipos nativos do PostgreSQL |
 | Exclusões | `ON DELETE RESTRICT` em todas as chaves estrangeiras | Serviços e contas são desativados, e nada some em cascata por engano | `CASCADE` |
 | Autenticação | JWT curto e refresh em cookie | Revogável e sem token acessível a scripts | Sessão opaca, `localStorage` |
+| Revogação do JWT | Conferir a família do `sid` a cada requisição | Logout e redefinição valem na hora, com uma consulta indexada e sem schema novo | Esperar até 15 minutos pela expiração |
+| Validade do refresh | 7 dias sem uso e 30 dias desde o login | Sessão ativa não precisa de novo login a cada semana, mas não dura para sempre | Validade fixa, rotação que estende sem limite |
 | E-mail | Outbox e worker próprio | Não perde mensagens e não exige Redis | `BackgroundTasks`, Celery |
 | Limites | Contadores no PostgreSQL | Valem entre processos, sem novo serviço | Memória, Redis |
 | Demo | Cadastro fechado, e-mail com limites e restauração noturna | Reduz abuso e mantém dados atuais | Cadastro aberto, botão de reset |
