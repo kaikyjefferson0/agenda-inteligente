@@ -17,7 +17,7 @@
 - **RN10. Sem preferência:** o cliente pode escolher um profissional ou "sem preferência". Nesse caso, o sistema atribui o profissional apto e livre com menos agendamentos não cancelados no dia local do horário. O empate é resolvido pelo cadastro mais antigo e, depois, pelo menor `id`.
 - **RN11. Cópia dos valores:** o agendamento guarda duração, preparo e preço do momento da reserva. Mudanças posteriores no serviço não o afetam, inclusive em remarcações.
 - **RN12. Dados do cliente:** na página pública, nome, e-mail e telefone são obrigatórios. O e-mail não é verificado, então os dados pertencem ao agendamento e nunca são usados para associar reservas.
-- **RN13. Idempotência:** a criação pública exige `Idempotency-Key`. Repetir a chave com os mesmos dados devolve o mesmo agendamento, **sem o link**, porque o token não pode ser recuperado do hash; nesse caso, o link fica disponível apenas pelo e-mail. Repetir a chave com dados diferentes é recusado.
+- **RN13. Idempotência:** a criação pública exige `Idempotency-Key`. A idempotência garante que o agendamento não é duplicado. Repetir a chave com os mesmos dados devolve o mesmo agendamento, **sem o link**, porque o token não pode ser recuperado do hash; nesse caso, o link fica disponível apenas pelo e-mail. A exceção ocorre quando o limite de e-mail impediu o envio na criação (RN26): a repetição gera um novo token, devolve o novo link e invalida o anterior. Essa troca de token é um efeito colateral aceito. Repetir a chave com dados diferentes é recusado.
 - **RN14. Nenhum conflito:** duas operações simultâneas nunca podem deixar blocos sobrepostos no mesmo profissional, nem um bloco sobre um bloqueio. A garantia é aplicada no banco, conforme o [modelo de dados](06-modelo-dados.md#garantia-de-nenhum-conflito).
 
 ## Status
@@ -46,7 +46,7 @@
 
 - **RN24. Convite e recuperação de senha:** usam links de uso único, guardados como hash. O convite vale 7 dias, e a recuperação, 1 hora. A recuperação responde igual para e-mail existente ou não.
 - **RN25. Notificações:** o cliente recebe e-mail na criação, no cancelamento e na remarcação, quando houver endereço. Falha no envio nunca desfaz a operação. Os e-mails não incluem texto livre digitado pelo cliente.
-- **RN26. Limites de e-mail:** o envio tem limites por destinatário e um teto diário global. Acima deles, o agendamento é mantido, nenhum e-mail é enfileirado, e a página pública mostra o link na tela.
+- **RN26. Limites de e-mail:** o envio tem limites por destinatário e um teto diário global. Acima deles, o agendamento é mantido, nenhum e-mail é enfileirado, e a página pública mostra o link na tela. Se a criação pública for repetida com a mesma `Idempotency-Key`, o agendamento não é duplicado, e o link é trocado por um novo, conforme a RN13.
 - **RN27. Cadastro:** `POST /auth/register` depende de `REGISTRATION_ENABLED`, que fica desligada na demo pública para evitar envio de mensagens enganosas a terceiros.
 - **RN28. Restrições do negócio demo:** impedem o uso do negócio para enviar conteúdo livre a terceiros. O nome do negócio, o `slug` e o nome dos serviços ficam travados, a criação de serviços é recusada, e convites e recuperação de senha ficam desligados.
 - **RN29. Restauração da demo:** toda noite, uma tarefa apaga e recria os dados do negócio demo, com datas relativas ao dia atual. Nenhum outro negócio é afetado. A demo mostra um aviso sobre essa restauração.

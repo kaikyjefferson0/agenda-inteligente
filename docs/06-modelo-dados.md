@@ -19,11 +19,14 @@ erDiagram
     businesses ||--o{ professionals : "tem"
     businesses ||--o{ services : "oferece"
     businesses ||--o{ appointments : "recebe"
+    businesses ||--o{ professional_services : "tem"
+    businesses ||--o{ working_hours : "tem"
+    businesses ||--o{ time_blocks : "tem"
     users ||--o| professionals : "pode atender como"
     users ||--o{ account_tokens : "recebe"
     users ||--o{ refresh_tokens : "abre"
     professionals ||--o{ professional_services : "atende"
-    services ||--o{ professional_services : "e atendido em"
+    services ||--o{ professional_services : "é atendido em"
     professionals ||--o{ working_hours : "define"
     professionals ||--o{ time_blocks : "registra"
     professionals ||--o{ appointments : "realiza"
@@ -45,14 +48,14 @@ erDiagram
         uuid business_id FK
         text name
         citext email UK
-        text password_hash "nulo ate aceitar convite"
+        text password_hash "nulo até aceitar convite"
         text role "owner ou professional"
         bool is_active
     }
     professionals {
         uuid id PK
         uuid business_id FK
-        uuid user_id FK,UK
+        uuid user_id FK, UK
         bool is_bookable
     }
     account_tokens {
@@ -83,8 +86,8 @@ erDiagram
     }
     professional_services {
         uuid business_id FK
-        uuid professional_id PK,FK
-        uuid service_id PK,FK
+        uuid professional_id PK, FK
+        uuid service_id PK, FK
     }
     working_hours {
         uuid id PK
@@ -114,11 +117,12 @@ erDiagram
         int preparation_minutes
         int price_cents
         text customer_name
-        citext customer_email "nulo em agendamento manual"
-        text customer_phone "nulo em agendamento manual"
+        citext customer_email "pode ser nulo em agendamento manual"
+        text customer_phone "pode ser nulo em agendamento manual"
         text status
         text origin "public ou staff"
         text access_token_hash UK
+        bool link_email_skipped "limite impediu o e-mail de criação"
         text idempotency_key
         text idempotency_fingerprint
         timestamptz cancelled_at
@@ -174,6 +178,7 @@ Exceções à agenda, como folgas. `CHECK (ends_at > starts_at)` e restrição `
 - `CHECK`: agendamentos com `origin = 'public'` exigem `customer_email` e `customer_phone`.
 - `access_token_hash` é único quando não nulo. Fica nulo em agendamento manual sem e-mail.
 - `idempotency_key` é única por negócio quando não nula. `idempotency_fingerprint` é o hash dos dados enviados, usado para detectar reuso da chave com dados diferentes.
+- `link_email_skipped` tem padrão `false` e fica `true` quando o limite de e-mail impede o envio na criação. Nesse caso, uma repetição idempotente substitui `access_token_hash`, conforme a RN13.
 - O histórico se limita a `created_at`, `updated_at` e `cancelled_at`. Não há tabela de eventos na V1.
 
 ### `email_outbox`
@@ -197,7 +202,7 @@ Contadores por janela. Chave primária `(key, window_start)`, com `count`. `key`
 
 ## Isolamento entre negócios
 
-`professionals` e `services` têm `UNIQUE (business_id, id)`. As tabelas dependentes usam chaves estrangeiras compostas:
+`users`, `professionals` e `services` têm `UNIQUE (business_id, id)`. As tabelas dependentes usam chaves estrangeiras compostas:
 
 - `appointments (business_id, professional_id)` referencia `professionals (business_id, id)`.
 - `appointments (business_id, service_id)` referencia `services (business_id, id)`.

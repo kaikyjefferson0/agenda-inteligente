@@ -41,16 +41,17 @@ O merge é bloqueado abaixo de:
 | CT08 | Profissional escolhido não atende o serviço | Recusado | Integração |
 | CT09 | Falha no envio de e-mail | Agendamento é mantido, e a falha fica registrada | Integração |
 | CT10 | Serviço alterado depois da reserva | Agendamento mantém duração, preparo e preço, inclusive ao remarcar | Integração |
-| CT23 | Mesma `Idempotency-Key` com os mesmos dados | Devolve o mesmo agendamento, sem criar outro e sem o link | Integração |
+| CT23 | Mesma `Idempotency-Key` com os mesmos dados, com o e-mail de criação enfileirado | Devolve o mesmo agendamento, sem criar outro e sem o link | Integração |
 | CT24 | Mesma `Idempotency-Key` com dados diferentes | Recusado com `IDEMPOTENCY_KEY_REUSED` | Integração |
 | CT31 | Bloqueio e reserva simultâneos no mesmo horário | Apenas um é aceito | Integração |
+| CT36 | Mesma `Idempotency-Key` com os mesmos dados, depois de o limite de e-mail impedir o envio na criação | Devolve o mesmo agendamento, sem criar outro, com novo link; o link anterior retorna `404`, e nenhum e-mail é enfileirado | Integração |
 
 ### Link do cliente
 
 | ID | Cenário | Resultado esperado | Nível |
 |---|---|---|---|
 | CT11 | Token inválido, adulterado ou expirado | `404`, sem revelar se o agendamento existe | Integração |
-| CT12 | Cancelar antes do prazo, no limite exato e depois dele | Aceito, aceito e recusado | Unidade e integração |
+| CT12 | Cancelar ou remarcar antes do prazo, no limite exato e depois dele | Aceito, aceito e recusado | Unidade e integração |
 | CT13 | Remarcar para horário ocupado | Recusado, e o horário original continua válido | Integração |
 | CT14 | Remarcar para horário livre | Troca atômica, e o horário antigo é liberado | Integração |
 
@@ -65,6 +66,7 @@ O merge é bloqueado abaixo de:
 | CT25 | Expediente alterado deixa agendamentos de fora | Aceito; agendamentos mantidos e listados na resposta | Integração |
 | CT33 | Equipe altera agendamento depois do prazo do cliente | Aceito | Integração |
 | CT34 | Marcar resultado antes do início ou alterar status final | Recusado | Unidade e integração |
+| CT35 | Criação ou remarcação pela equipe fora do expediente ou no passado | Recusada | Integração |
 
 ### Segurança
 
@@ -111,12 +113,12 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC08 | CT25 |
 | UC09 | CT17, CT31 |
 | UC10 | CT01, CT02, CT03, CT04, CT05 |
-| UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, E2E01 |
+| UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, CT36, E2E01 |
 | UC12 | CT11, E2E01 |
 | UC13 | CT03, CT12, E2E01 |
-| UC14 | CT10, CT13, CT14 |
+| UC14 | CT10, CT12, CT13, CT14 |
 | UC15 | CT20, E2E02 |
-| UC16 | CT15, CT16 |
-| UC17 | CT33, CT34 |
+| UC16 | CT15, CT16, CT35 |
+| UC17 | CT33, CT34, CT35 |
 | UC18 | CT34 |
 | Transversal | CT19, CT20, CT29 |

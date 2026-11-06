@@ -16,7 +16,7 @@ Exemplo de erro:
 
 ```json
 {
-  "type": "https://agenda-inteligente.example/problems/slot-unavailable",
+  "type": "https://api.exemplo.com/problems/slot-unavailable",
   "title": "Horário indisponível",
   "status": 409,
   "code": "SLOT_UNAVAILABLE",
@@ -110,13 +110,15 @@ Content-Type: application/json
   "ends_at": "2026-11-10T09:30:00-03:00",
   "service": { "name": "Corte", "price_cents": 5000 },
   "professional": { "name": "Profissional Demo" },
-  "access_url": "https://app.example.com/agendamento/<token>",
+  "access_url": "https://app.exemplo.com/agendamento/<token>",
   "email_status": "queued"
 }
 ```
 
 - `email_status` pode ser `queued` ou `skipped`, quando um limite de envio foi atingido (RN26).
 - Em uma repetição idempotente, a resposta é `200`, com o mesmo agendamento, `access_url: null` e `email_status: "unchanged"` (RN13).
+- Se o limite de e-mail impediu o envio na criação, a repetição responde `200`, com o mesmo agendamento, um novo `access_url` e `email_status: "skipped"`. O link anterior deixa de funcionar, e nenhum e-mail é enfileirado (RN13, RN26).
+- A idempotência garante que o agendamento não é duplicado. A troca do token é um efeito colateral aceito nesse caso.
 
 ## Infraestrutura
 
@@ -128,6 +130,7 @@ Content-Type: application/json
 
 | HTTP | `code` | Quando |
 |---|---|---|
+| `400` | `INVALID_TOKEN` | Convite ou recuperação inválido, expirado ou já usado |
 | `401` | `INVALID_CREDENTIALS` | Login incorreto, conta desativada ou convite não aceito |
 | `401` | `NOT_AUTHENTICATED` | Token de acesso ausente, inválido ou expirado |
 | `401` | `INVALID_REFRESH_TOKEN` | Refresh inválido, expirado ou reutilizado |
@@ -135,7 +138,6 @@ Content-Type: application/json
 | `403` | `REGISTRATION_DISABLED` | Cadastro desligado |
 | `403` | `DEMO_RESTRICTED` | Operação travada no negócio demo |
 | `404` | `NOT_FOUND` | Inexistente, de outro negócio ou token inválido |
-| `400` | `INVALID_TOKEN` | Convite ou recuperação inválido, expirado ou já usado |
 | `409` | `SLOT_UNAVAILABLE` | Horário ocupado, fora do expediente ou da antecedência |
 | `409` | `CHANGE_DEADLINE_PASSED` | Prazo do cliente vencido |
 | `409` | `INVALID_STATUS_TRANSITION` | Agendamento em status final ou resultado antes do início |

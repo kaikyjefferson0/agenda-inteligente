@@ -42,7 +42,7 @@ As regras citadas estão em [Regras de negócio](03-regras-negocio.md), e os tes
 
 - **Ator:** Dono. **Regras:** RN11, RN28.
 - **Fluxo:** cria, edita ou desativa serviços com nome, duração, preparo e preço. Serviços com histórico são desativados, não excluídos.
-- **Exceções:** valores inválidos; nome travado na demo.
+- **Exceções:** valores inválidos; nome travado ou criação de serviço recusada na demo.
 
 ### UC07. Definir serviços de cada profissional
 
@@ -72,9 +72,9 @@ As regras citadas estão em [Regras de negócio](03-regras-negocio.md), e os tes
 
 ### UC11. Criar agendamento e receber o link
 
-- **Ator:** Cliente. **Regras:** RN05, RN08 a RN14, RN16, RN25, RN26.
+- **Ator:** Cliente. **Regras:** RN05, RN07, RN08 a RN14, RN16, RN25, RN26.
 - **Fluxo:** escolhe um horário e informa seus dados; o sistema atribui o profissional, se necessário, confirma, mostra o link e envia o e-mail.
-- **Exceções:** horário ocupado nesse intervalo (`409`); limite de requisições (`429`); limite de e-mail, com link apenas na tela; chave de idempotência reenviada.
+- **Exceções:** horário ocupado nesse intervalo (`409`); limite de requisições (`429`); limite de e-mail, com link apenas na tela; chave de idempotência reenviada, com novo link se o limite de e-mail impediu o envio na criação.
 
 ### UC12. Consultar agendamento pelo link
 
@@ -84,15 +84,15 @@ As regras citadas estão em [Regras de negócio](03-regras-negocio.md), e os tes
 
 ### UC13. Cancelar pelo link
 
-- **Ator:** Cliente. **Regras:** RN15, RN17, RN25.
+- **Ator:** Cliente. **Regras:** RN15, RN17, RN25, RN26.
 - **Fluxo:** confirma o cancelamento; o horário é liberado, e o cliente recebe a confirmação por e-mail.
 - **Exceções:** prazo vencido; agendamento em status final.
 
 ### UC14. Remarcar pelo link
 
-- **Ator:** Cliente. **Regras:** RN05, RN17, RN18, RN25.
+- **Ator:** Cliente. **Regras:** RN05, RN17, RN18, RN25, RN26.
 - **Fluxo:** escolhe um novo horário; o sistema troca de forma atômica e envia a confirmação por e-mail.
-- **Exceções:** prazo vencido; novo horário ocupado, mantendo o original.
+- **Exceções:** prazo vencido; agendamento em status final; novo horário ocupado, mantendo o original.
 
 ## Agenda da equipe
 
@@ -104,18 +104,18 @@ As regras citadas estão em [Regras de negócio](03-regras-negocio.md), e os tes
 
 ### UC16. Criar agendamento manual
 
-- **Atores:** Dono, Profissional (na própria agenda). **Regras:** RN07, RN14, RN19.
+- **Atores:** Dono, Profissional (na própria agenda). **Regras:** RN07, RN14, RN16, RN19, RN25, RN26.
 - **Fluxo:** escolhe profissional, serviço e horário, e informa os dados do cliente. O e-mail é opcional; se informado, o cliente recebe o link.
 - **Exceções:** fora do expediente; horário em conflito; horário no passado.
 
 ### UC17. Cancelar ou remarcar sem o prazo do cliente
 
-- **Atores:** Dono, Profissional (na própria agenda). **Regras:** RN14, RN20, RN25.
+- **Atores:** Dono, Profissional (na própria agenda). **Regras:** RN14, RN20, RN25, RN26.
 - **Fluxo:** cancela ou remarca; o cliente recebe e-mail, quando houver endereço.
 - **Exceções:** agendamento em status final; novo horário fora do expediente ou em conflito.
 
 ### UC18. Marcar como concluído ou não compareceu
 
 - **Atores:** Dono, Profissional (na própria agenda). **Regras:** RN15.
-- **Fluxo:** registra o resultado depois do início do atendimento. O tempo continua ocupado.
+- **Fluxo:** registra o resultado a partir do início do atendimento. O tempo continua ocupado.
 - **Exceções:** antes do início; agendamento em status final.
