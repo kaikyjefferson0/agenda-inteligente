@@ -59,6 +59,7 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://agenda:agenda_ci@localhost:5432/agenda
       JWT_SECRET: somente-ci-nao-usar-em-producao-0001
       RATE_LIMIT_KEY_SECRET: somente-ci-nao-usar-em-producao-0002
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
     steps:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
