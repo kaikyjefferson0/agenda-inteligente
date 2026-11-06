@@ -1,10 +1,39 @@
-from fastapi import APIRouter, status
+from uuid import UUID
 
-from app.api.deps import NowDep, OwnerSessionDep, SessionDep, SettingsDep
+from fastapi import APIRouter, Response, status
+
+from app.api.deps import (
+    CurrentSessionDep,
+    NowDep,
+    OwnerSessionDep,
+    SessionDep,
+    SettingsDep,
+)
 from app.schemas.auth import InvitationResponse, InviteProfessionalRequest
-from app.services import invitations
+from app.schemas.professionals import (
+    ProfessionalData,
+    SetProfessionalServicesRequest,
+)
+from app.schemas.schedule import (
+    AppointmentData,
+    CreateTimeBlockRequest,
+    IntervalData,
+    ReplaceWorkingHoursRequest,
+    ReplaceWorkingHoursResponse,
+    TimeBlockData,
+    WorkingHoursResponse,
+)
+from app.services import invitations, schedule, team
 
 router = APIRouter(prefix="/professionals", tags=["professionals"])
+
+
+@router.get("")
+async def list_professionals(
+    current: CurrentSessionDep, session: SessionDep
+) -> list[ProfessionalData]:
+    profiles = await team.list_professionals(session, current.user)
+    return [ProfessionalData.model_validate(profile) for profile in profiles]
 
 
 @router.post("/invitations", status_code=status.HTTP_202_ACCEPTED)
@@ -28,3 +57,113 @@ async def invite_professional(
         email=invitation.email,
         expires_at=invitation.expires_at,
     )
+
+
+@router.post(
+    "/me",
+    status_code=status.HTTP_201_CREATED,
+    responses={status.HTTP_200_OK: {"description": "O registro já existia"}},
+)
+async def start_serving(
+    response: Response, current: OwnerSessionDep, session: SessionDep
+) -> ProfessionalData:
+    profile, created = await team.start_serving(session, owner=current.user)
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return ProfessionalData.model_validate(profile)
+
+
+@router.post("/{professional_id}/deactivate", status_code=status.HTTP_204_NO_CONTENT)
+async def deactivate_professional(
+    professional_id: UUID,
+    current: OwnerSessionDep,
+    session: SessionDep,
+    now: NowDep,
+) -> None:
+    await team.deactivate_professional(
+        session,
+        business_id=current.business.id,
+        professional_id=professional_id,
+        now=now,
+    )
+
+
+@router.put("/{professional_id}/services")
+async def set_professional_services(
+    professional_id: UUID,
+    body: SetProfessionalServicesRequest,
+    current: OwnerSessionDep,
+    session: SessionDep,
+) -> ProfessionalData:
+    profile = await team.set_professional_services(
+        session,
+        business_id=current.business.id,
+        professional_id=professional_id,
+        service_ids=body.service_ids,
+    )
+    return ProfessionalData.model_validate(profile)
+
+
+@router.get("/{professional_id}/working-hours")
+async def get_working_hours(
+    professional_id: UUID, current: CurrentSessionDep, session: SessionDep
+) -> WorkingHoursResponse:
+    intervals = await schedule.get_working_hours(
+        session, viewer=current.user, professional_id=professional_id
+    )
+    return WorkingHoursResponse(
+        intervals=[IntervalData.model_validate(item) for item in intervals]
+    )
+
+
+@router.put("/{professional_id}/working-hours")
+async def replace_working_hours(
+    professional_id: UUID,
+    body: ReplaceWorkingHoursRequest,
+    current: CurrentSessionDep,
+    session: SessionDep,
+    now: NowDep,
+) -> ReplaceWorkingHoursResponse:
+    update = await schedule.replace_working_hours(
+        session,
+        viewer=current.user,
+        timezone=current.business.timezone,
+        professional_id=professional_id,
+        intervals=body.intervals,
+        now=now,
+    )
+    return ReplaceWorkingHoursResponse(
+        intervals=[IntervalData.model_validate(item) for item in update.intervals],
+        appointments_outside_hours=[
+            AppointmentData.model_validate(appointment)
+            for appointment in update.appointments_outside_hours
+        ],
+    )
+
+
+@router.get("/{professional_id}/time-blocks")
+async def list_time_blocks(
+    professional_id: UUID, current: CurrentSessionDep, session: SessionDep
+) -> list[TimeBlockData]:
+    blocks = await schedule.list_time_blocks(
+        session, viewer=current.user, professional_id=professional_id
+    )
+    return [TimeBlockData.model_validate(block) for block in blocks]
+
+
+@router.post("/{professional_id}/time-blocks", status_code=status.HTTP_201_CREATED)
+async def create_time_block(
+    professional_id: UUID,
+    body: CreateTimeBlockRequest,
+    current: CurrentSessionDep,
+    session: SessionDep,
+) -> TimeBlockData:
+    block = await schedule.create_time_block(
+        session,
+        viewer=current.user,
+        professional_id=professional_id,
+        starts_at=body.starts_at,
+        ends_at=body.ends_at,
+        reason=body.reason,
+    )
+    return TimeBlockData.model_validate(block)

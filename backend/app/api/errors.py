@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
 from app.domain.errors import AppError, ErrorCode
+from app.schemas.schedule import AppointmentData
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,14 @@ PROBLEMS: dict[ErrorCode, Problem] = {
     ),
     ErrorCode.NOT_FOUND: Problem(
         404, "Não encontrado", "O recurso solicitado não foi encontrado."
+    ),
+    ErrorCode.APPOINTMENT_CONFLICTS: Problem(
+        409,
+        "Agendamentos em conflito",
+        "Resolva os agendamentos listados antes de continuar.",
+    ),
+    ErrorCode.TIME_BLOCK_OVERLAP: Problem(
+        409, "Bloqueio sobreposto", "Já existe um bloqueio nesse período."
     ),
     ErrorCode.EMAIL_IN_USE: Problem(
         409, "E-mail em uso", "Este e-mail já está em uso."
@@ -100,13 +109,28 @@ def problem_response(
     )
 
 
+def _app_error_extra(error: AppError) -> dict[str, Any]:
+    extra: dict[str, Any] = {}
+    if error.conflicts is not None:
+        extra["conflicts"] = [
+            AppointmentData.model_validate(appointment).model_dump(mode="json")
+            for appointment in error.conflicts
+        ]
+    if error.invalid_field is not None:
+        field, message = error.invalid_field
+        extra["errors"] = [
+            {"loc": ["body", field], "msg": message, "type": "value_error"}
+        ]
+    return extra
+
+
 def app_error_response(error: AppError) -> JSONResponse:
     headers: dict[str, str] = {}
     if error.retry_after is not None:
         headers["Retry-After"] = str(error.retry_after)
     if error.code is ErrorCode.NOT_AUTHENTICATED:
         headers["WWW-Authenticate"] = "Bearer"
-    return problem_response(error.code, headers=headers)
+    return problem_response(error.code, extra=_app_error_extra(error), headers=headers)
 
 
 async def _handle_app_error(_: Request, error: Exception) -> JSONResponse:

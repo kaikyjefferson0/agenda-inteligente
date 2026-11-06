@@ -30,14 +30,14 @@ As regras citadas estão em [Regras de negócio](03-regras-negocio.md), e os tes
 - **Fluxo do Dono:** passa a atender criando o próprio registro de profissional.
 - **Fluxo de desativação:** o sistema confere os agendamentos futuros e desativa.
 - **Exceções:** e-mail já em uso; há agendamentos futuros (`409`, com a lista); convite bloqueado na demo; limite de convites ou de e-mail (`429`, sem criar nada).
-- **Situação da implementação:** a Fase 3 entregou apenas o fluxo de convite e a perda de acesso de conta desativada. Estão **pendentes para a próxima fase** o fluxo do Dono (`POST /professionals/me`), o fluxo de desativação (`POST /professionals/{id}/deactivate`, com a verificação de agendamentos futuros da RN23 e o CT18) e a listagem (`GET /professionals`).
+- **Situação da implementação:** concluído. A Fase 3 entregou o fluxo de convite e a perda de acesso de conta desativada. A Fase 4 entregou o fluxo do Dono (`POST /professionals/me`), o fluxo de desativação (`POST /professionals/{id}/deactivate`, com a verificação de agendamentos futuros da RN23 e o CT18) e a listagem (`GET /professionals`).
 
 ## Configuração
 
 ### UC05. Configurar o negócio
 
-- **Ator:** Dono. **Regras:** RN01, RN05, RN06, RN17, RN28.
-- **Fluxo:** altera nome, `slug`, fuso, passo da grade, antecedência e prazo de alteração. Os novos valores não afetam agendamentos existentes, exceto o prazo, que é avaliado no momento da alteração.
+- **Ator:** Dono. **Regras:** RN01, RN05, RN06, RN17, RN22, RN28.
+- **Fluxo:** altera nome, `slug`, fuso, passo da grade, antecedência e prazo de alteração. Os novos valores não afetam agendamentos existentes, exceto o prazo, que é avaliado no momento da alteração. Ao trocar o fuso, a resposta lista os agendamentos futuros confirmados que ficaram fora do expediente no novo fuso.
 - **Exceções:** `slug` em uso; valores inválidos; campos travados na demo.
 
 ### UC06. Gerenciar serviços

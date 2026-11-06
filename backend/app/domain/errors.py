@@ -1,4 +1,7 @@
+from collections.abc import Sequence
 from enum import StrEnum
+
+from app.domain.schedule import AppointmentSummary
 
 
 class ErrorCode(StrEnum):
@@ -10,6 +13,8 @@ class ErrorCode(StrEnum):
     REGISTRATION_DISABLED = "REGISTRATION_DISABLED"
     DEMO_RESTRICTED = "DEMO_RESTRICTED"
     NOT_FOUND = "NOT_FOUND"
+    APPOINTMENT_CONFLICTS = "APPOINTMENT_CONFLICTS"
+    TIME_BLOCK_OVERLAP = "TIME_BLOCK_OVERLAP"
     EMAIL_IN_USE = "EMAIL_IN_USE"
     SLUG_IN_USE = "SLUG_IN_USE"
     VALIDATION_ERROR = "VALIDATION_ERROR"
@@ -22,7 +27,17 @@ class ErrorCode(StrEnum):
 class AppError(Exception):
     """A business failure. The API layer translates it to HTTP."""
 
-    def __init__(self, code: ErrorCode, *, retry_after: int | None = None) -> None:
+    def __init__(
+        self,
+        code: ErrorCode,
+        *,
+        retry_after: int | None = None,
+        conflicts: Sequence[AppointmentSummary] | None = None,
+        invalid_field: tuple[str, str] | None = None,
+    ) -> None:
         super().__init__(code.value)
         self.code = code
         self.retry_after = retry_after
+        self.conflicts = conflicts
+        # (field, message), for a rule that needs the stored values to be checked.
+        self.invalid_field = invalid_field

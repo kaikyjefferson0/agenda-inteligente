@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.models import RateLimitCounter
-from tests.auth.conftest import CountingPasswordHasher
 from tests.auth.helpers import (
     API,
     OWNER_EMAIL,
@@ -18,6 +17,7 @@ from tests.auth.helpers import (
     login,
     register_owner,
 )
+from tests.conftest import CountingPasswordHasher
 
 pytestmark = mark.anyio
 

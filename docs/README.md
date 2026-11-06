@@ -42,7 +42,18 @@ O engenheiro responsável aprovou as decisões principais durante a Fase 0. Os p
 | E-mails de conta acima do limite | Mesmos contadores; recuperação responde `202`, e convite responde `429` sem criar nada | RN26 | Resolvido na Fase 3 |
 | Troca de senha com usuário logado | Fora da V1; a nova senha passa pela recuperação | UC03 | Resolvido na Fase 3 |
 | Renovação entre abas | Precisa ser única, sob pena de revogar a família; obrigatório na fase do frontend | UC02, Arquitetura | Pendente para o frontend |
-| Restante do UC04 | `POST /professionals/me`, `POST /professionals/{id}/deactivate`, com RN23 e CT18, e `GET /professionals` ainda não foram implementados | UC04, API | Pendente para a próxima fase |
+| Restante do UC04 | `POST /professionals/me`, `POST /professionals/{id}/deactivate`, com RN23 e CT18, e `GET /professionals` foram implementados | UC04, API | Resolvido na Fase 4 |
+| Formatos da configuração | Expediente em `intervals`, com `weekday`, `start_time` e `end_time`; `conflicts` e `appointments_outside_hours` no mesmo formato, sem contato do cliente; instantes em UTC; listas simples, sem paginação nem filtros | UC08, UC09, API | Resolvido na Fase 4 |
+| Intervalos encostados | Aceitos e guardados como enviados, sem juntar; um atendimento não atravessa a divisa entre eles | RN03, UC08, API | Resolvido na Fase 4 |
+| Exclusão de serviço | Não há `DELETE`; todo serviço é apenas desativado por `PATCH` | UC06, API | Resolvido na Fase 4 |
+| Desativação de profissional | Definitiva na V1: sem rota para reativar, e o e-mail continua em uso; só o Dono volta a atender | RN23, RN24, UC04, API | Resolvido na Fase 4 |
+| Troca de fuso | Aceita; a resposta de `PATCH /business` lista os agendamentos futuros confirmados que ficaram fora do expediente no novo fuso | RN22, UC05, CT25, API | Resolvido na Fase 4 |
+| `POST /professionals/me` repetido | `200` com o registro existente e `is_bookable = true`, sem código de erro novo | UC04, API | Resolvido na Fase 4 |
+| Serviços de um profissional | Lidos em `service_ids`, de `GET /professionals`; serviço de outro negócio responde `404`, e serviço inativo é aceito | RN07, UC07, API | Resolvido na Fase 4 |
+| Agendamentos que contam em cada regra | RN21: não cancelados, até `blocked_until`. RN22 e RN23: confirmados, com início no futuro; atendimento em andamento não conta. RN22 também considera o preparo | RN21, RN22, RN23, CT17 | Resolvido na Fase 4 |
+| Campos travados na demo | Recusados só quando o valor muda; reenviar o mesmo valor é aceito | RN28, CT32 | Resolvido na Fase 4 |
+| Limites máximos da configuração | Faixas na API, além dos mínimos do modelo de dados; antecedência mínima não supera a máxima | RN05, UC05, UC06, API | Resolvido na Fase 4 |
+| Bloqueio no passado | Aceito, sem regra de data; o conflito com agendamentos vale normalmente | RN21, UC09, API | Resolvido na Fase 4 |
 | `EMAIL_IN_USE` no cadastro e no convite | Revela que o e-mail existe; aceito, com limites por IP e por negócio | API | A revisar |
 | Restrições da demo | Nome do negócio, `slug` e nome dos serviços travados; criação de serviços recusada; convites e recuperação de senha desligados | RN28 | A revisar |
 | Conteúdo dos e-mails | Sem texto livre digitado pelo cliente | RN25 | A revisar |

@@ -1,37 +1,15 @@
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
-from zoneinfo import available_timezones
 
-from pydantic import (
-    AfterValidator,
-    BaseModel,
-    ConfigDict,
-    EmailStr,
-    Field,
-    StringConstraints,
-)
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
 
 from app.domain.auth import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
 from app.models import UserRole
+from app.schemas.common import Name, RequestModel, Slug, TimeZoneName
 
-SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 MAX_TOKEN_LENGTH = 512
 
-
-def _validate_timezone(value: str) -> str:
-    if value not in available_timezones():
-        raise ValueError("timezone must be a valid IANA name")
-    return value
-
-
-Name = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
-]
-Slug = Annotated[
-    str, StringConstraints(min_length=3, max_length=63, pattern=SLUG_PATTERN)
-]
-TimeZoneName = Annotated[str, AfterValidator(_validate_timezone)]
 NewPassword = Annotated[
     str,
     StringConstraints(min_length=PASSWORD_MIN_LENGTH, max_length=PASSWORD_MAX_LENGTH),
@@ -39,12 +17,6 @@ NewPassword = Annotated[
 AccountTokenValue = Annotated[
     str, StringConstraints(min_length=1, max_length=MAX_TOKEN_LENGTH)
 ]
-
-
-class RequestModel(BaseModel):
-    """Refuses unknown fields, such as a business_id sent by the client."""
-
-    model_config = ConfigDict(extra="forbid")
 
 
 class BusinessRegistration(RequestModel):
