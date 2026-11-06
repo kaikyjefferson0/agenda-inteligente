@@ -63,7 +63,7 @@ O merge é bloqueado abaixo de:
 | CT16 | Criação manual sobre outro horário | Recusada | Integração |
 | CT17 | Bloqueio sobre agendamento confirmado | Recusado, com a lista de conflitos | Integração |
 | CT18 | Desativar profissional com agendamentos futuros | Recusado até que sejam resolvidos | Integração |
-| CT25 | Expediente alterado deixa agendamentos de fora | Aceito; agendamentos mantidos e listados na resposta | Integração |
+| CT25 | Expediente ou fuso alterado deixa agendamentos de fora | Aceito; agendamentos mantidos e listados na resposta | Integração |
 | CT33 | Equipe altera agendamento depois do prazo do cliente | Aceito | Integração |
 | CT34 | Marcar resultado antes do início ou alterar status final | Recusado | Unidade e integração |
 | CT35 | Criação ou remarcação pela equipe fora do expediente ou no passado | Recusada com `SLOT_UNAVAILABLE` | Integração |
@@ -117,7 +117,7 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC02 | CT28, CT37, CT38, CT41, CT42, CT43, E2E02 |
 | UC03 | CT21, CT32, CT39, CT40, CT45 |
 | UC04 | CT18, CT21, CT32, CT44, CT45, CT46 |
-| UC05 | CT19, CT20, CT32 |
+| UC05 | CT19, CT20, CT25, CT32 |
 | UC06 | CT10, CT32 |
 | UC07 | CT08 |
 | UC08 | CT25 |

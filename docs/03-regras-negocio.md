@@ -39,7 +39,7 @@
 - **RN19. Agendamento manual:** a equipe pode criar agendamentos sem os limites de antecedência. Só o nome do cliente é obrigatório. O horário precisa respeitar o expediente e as regras de conflito, não pode estar no passado e não precisa seguir a grade.
 - **RN20. Alteração pela equipe:** a equipe cancela ou remarca sem o prazo do cliente, sob as mesmas restrições da RN19. Só agendamentos `confirmed` podem ser alterados.
 - **RN21. Bloqueio sobre agendamento:** é recusado, e a resposta lista os agendamentos em conflito para serem resolvidos antes.
-- **RN22. Mudança de expediente:** é aceita e vale para novas reservas. Os agendamentos existentes são mantidos, e a resposta lista os que ficaram fora do novo expediente.
+- **RN22. Mudança de expediente:** é aceita e vale para novas reservas. Os agendamentos existentes são mantidos, e a resposta lista os que ficaram fora do novo expediente. A troca do fuso do negócio segue a mesma regra, porque o expediente é guardado em hora local e passa a cobrir outros instantes.
 - **RN23. Desativação:** é recusada enquanto o profissional tiver agendamentos futuros confirmados. Depois de desativado, o profissional sai das novas reservas e perde o acesso. Quando o Dono deixa de atender, mantém o login e apenas sai das novas reservas.
 
 ## Contas e demo
