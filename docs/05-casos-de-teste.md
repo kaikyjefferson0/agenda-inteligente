@@ -66,7 +66,7 @@ O merge é bloqueado abaixo de:
 | CT25 | Expediente alterado deixa agendamentos de fora | Aceito; agendamentos mantidos e listados na resposta | Integração |
 | CT33 | Equipe altera agendamento depois do prazo do cliente | Aceito | Integração |
 | CT34 | Marcar resultado antes do início ou alterar status final | Recusado | Unidade e integração |
-| CT35 | Criação ou remarcação pela equipe fora do expediente ou no passado | Recusada | Integração |
+| CT35 | Criação ou remarcação pela equipe fora do expediente ou no passado | Recusada com `SLOT_UNAVAILABLE` | Integração |
 
 ### Segurança
 

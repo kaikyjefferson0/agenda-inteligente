@@ -138,7 +138,7 @@ Content-Type: application/json
 | `403` | `REGISTRATION_DISABLED` | Cadastro desligado |
 | `403` | `DEMO_RESTRICTED` | Operação travada no negócio demo |
 | `404` | `NOT_FOUND` | Inexistente, de outro negócio ou token inválido |
-| `409` | `SLOT_UNAVAILABLE` | Horário ocupado, fora do expediente ou da antecedência |
+| `409` | `SLOT_UNAVAILABLE` | Horário ocupado, horário no passado, fora do expediente ou da antecedência |
 | `409` | `CHANGE_DEADLINE_PASSED` | Prazo do cliente vencido |
 | `409` | `INVALID_STATUS_TRANSITION` | Agendamento em status final ou resultado antes do início |
 | `409` | `APPOINTMENT_CONFLICTS` | Bloqueio ou desativação com conflitos; inclui `conflicts` |
