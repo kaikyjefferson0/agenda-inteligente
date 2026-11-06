@@ -147,5 +147,6 @@ Content-Type: application/json
 | `409` | `IDEMPOTENCY_KEY_REUSED` | Mesma chave com dados diferentes |
 | `422` | `VALIDATION_ERROR` | Dados inválidos, ou profissional que não atende o serviço |
 | `429` | `RATE_LIMITED` | Limite excedido; inclui `Retry-After` |
+| `503` | `DATABASE_UNAVAILABLE` | `GET /health` não conseguiu acessar o banco |
 
 No negócio demo, `POST /auth/password/forgot` continua respondendo `202`, mas não enfileira e-mail.
