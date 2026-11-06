@@ -2,7 +2,7 @@
 
 Sistema de agendamento online para negócios de beleza e bem-estar. Projeto de portfólio full stack, com a documentação em [`docs/`](docs/README.md).
 
-**Estado atual:** Fase 1, apenas a estrutura do projeto. Ainda não há regras de negócio.
+**Estado atual:** Fase 2, com a estrutura do projeto e o modelo de dados: 12 tabelas e a primeira migração. Ainda não há rotas de domínio nem regras de negócio na aplicação.
 
 ## Pré-requisitos
 
@@ -33,23 +33,44 @@ O código é montado nos containers, e as alterações recarregam sozinhas. Depo
 docker compose up --build --renew-anon-volumes
 ```
 
+## Modelo de dados e migrações
+
+Os modelos SQLAlchemy ficam em `backend/app/models/`, e as migrações, em `backend/alembic/versions/`. As tabelas e restrições estão descritas em [`docs/06-modelo-dados.md`](docs/06-modelo-dados.md).
+
+As migrações não rodam sozinhas. Com os containers no ar, aplique-as depois de subir o projeto pela primeira vez e sempre que houver uma nova:
+
+```bash
+docker compose exec api alembic upgrade head
+```
+
+Para conferir a revisão aplicada e se os modelos estão sincronizados com as migrações:
+
+```bash
+docker compose exec api alembic current
+docker compose exec api alembic check
+```
+
+## Testes
+
+```bash
+docker compose exec api pytest
+```
+
+Os testes do backend usam o PostgreSQL real do Compose e, por isso, rodam no container. Os testes de migração e de restrições criam os bancos `agenda_test` e `agenda_migrations_test`, recriados a cada execução, então o banco de desenvolvimento não é alterado e não precisa estar migrado.
+
 ## Comandos úteis
 
 Com os containers no ar:
 
 ```bash
 # Backend
-docker compose exec api pytest
 docker compose exec api ruff check .
 docker compose exec api ruff format --check .
-docker compose exec api alembic current
 
 # Frontend
 docker compose exec frontend npm run lint
 docker compose exec frontend npm run build
 ```
-
-Os testes do backend usam o PostgreSQL real do Compose e, por isso, rodam no container.
 
 ## Estrutura
 
