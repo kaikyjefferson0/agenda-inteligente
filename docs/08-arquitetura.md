@@ -189,6 +189,8 @@ Em cada pull request:
 5. **Ponta a ponta:** Playwright nos fluxos E2E01 e E2E02.
 6. **Imagens:** build das imagens Docker.
 
+Os itens 1, 2, 3 e 6, além do ESLint e do `tsc` do item 4, já rodam em `.github/workflows/ci.yml`. O Vitest e o Playwright entram na etapa do frontend, junto com os primeiros testes e os fluxos E2E01 e E2E02.
+
 ## Deploy
 
 - **API, worker e banco:** PaaS, como Render ou Railway.

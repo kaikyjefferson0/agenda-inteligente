@@ -2,7 +2,7 @@
 
 Sistema de agendamento online para negócios de beleza e bem-estar. Projeto de portfólio full stack, com a documentação em [`docs/`](docs/README.md).
 
-**Estado atual:** Fase 4, com a autenticação e a configuração no backend. A autenticação cobre cadastro do negócio e do Dono, login, logout, renovação de sessão, convite de profissional e recuperação de senha. A configuração cobre as definições do negócio, os serviços, a equipe (Dono como profissional, desativação e listagem), os serviços de cada profissional, o expediente semanal e os bloqueios. Os e-mails apenas entram na `email_outbox`, porque o worker ainda não existe. O agendamento, a disponibilidade, a página pública e o frontend de autenticação virão nas fases seguintes.
+**Estado atual:** Fase 4, com a autenticação e a configuração no backend. A autenticação cobre cadastro do negócio e do Dono, login, logout, renovação de sessão, convite de profissional e recuperação de senha. A configuração cobre as definições do negócio, os serviços, a equipe (Dono como profissional, desativação e listagem), os serviços de cada profissional, o expediente semanal e os bloqueios. Os e-mails apenas entram na `email_outbox`, porque o worker ainda não existe. O agendamento, a disponibilidade, a página pública e o frontend de autenticação virão nas fases seguintes. O projeto tem CI no GitHub Actions, que roda em todo pull request para a `main`.
 
 ## Pré-requisitos
 
@@ -68,11 +68,18 @@ Com os containers no ar:
 # Backend
 docker compose exec api ruff check .
 docker compose exec api ruff format --check .
+docker compose exec api mypy
+
+# Testes do backend com cobertura: mínimo de 80% no geral e de 90% em app/domain
+docker compose exec api pytest --cov --cov-report=term-missing --cov-fail-under=80
+docker compose exec api coverage report --include="app/domain/*" --fail-under=90
 
 # Frontend
 docker compose exec frontend npm run lint
 docker compose exec frontend npm run build
 ```
+
+O `coverage report` usa os dados gravados pelo `pytest --cov`, então rode-o depois dele.
 
 ## Estrutura
 
@@ -94,6 +101,8 @@ A arquitetura está descrita em [`docs/08-arquitetura.md`](docs/08-arquitetura.m
 | SQLAlchemy | 2.1.8 |
 | Alembic | 1.20.1 |
 | Pydantic | 2.14.3 |
+| mypy | 2.3.1 |
+| pytest-cov | 7.0.0 |
 | Node | 24 |
 | React | 19.3.1 |
 | Vite | 8.3.6 |

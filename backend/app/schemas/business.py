@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from pydantic import Field
@@ -24,13 +24,13 @@ ChangeDeadline = Annotated[int, Field(ge=0, le=MAX_CHANGE_DEADLINE_MINUTES)]
 
 
 class UpdateBusinessRequest(RequestModel):
-    name: Name = Field(default=None)
-    slug: Slug = Field(default=None)
-    timezone: TimeZoneName = Field(default=None)
-    slot_step_minutes: SlotStep = Field(default=None)
-    min_advance_minutes: MinAdvance = Field(default=None)
-    max_advance_days: MaxAdvance = Field(default=None)
-    change_deadline_minutes: ChangeDeadline = Field(default=None)
+    name: Name = Field(default=cast(Name, None))
+    slug: Slug = Field(default=cast(Slug, None))
+    timezone: TimeZoneName = Field(default=cast(TimeZoneName, None))
+    slot_step_minutes: SlotStep = Field(default=cast(SlotStep, None))
+    min_advance_minutes: MinAdvance = Field(default=cast(MinAdvance, None))
+    max_advance_days: MaxAdvance = Field(default=cast(MaxAdvance, None))
+    change_deadline_minutes: ChangeDeadline = Field(default=cast(ChangeDeadline, None))
 
 
 class BusinessData(ResponseModel):

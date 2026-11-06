@@ -9,7 +9,7 @@ from app.models import Appointment, AppointmentStatus
 
 
 async def _summaries(
-    session: AsyncSession, query: Select[tuple[Appointment]]
+    session: AsyncSession, query: Select[Appointment]
 ) -> list[AppointmentSummary]:
     rows = await session.scalars(query.order_by(Appointment.starts_at, Appointment.id))
     return [
