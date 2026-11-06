@@ -40,8 +40,12 @@ from tests.configuration.helpers import (
 pytestmark = mark.anyio
 
 
+IDEMPOTENCY_KEY = "8f14e45f-ceea-467f-a9f7-1d2e3c4b5a69"
+
+
 @dataclass
 class Scene:
+    appointment_id: UUID
     business_id: UUID
     other_business_id: UUID
     professional_id: UUID
@@ -83,8 +87,14 @@ async def scene(
         headers=bearer(owner_token),
     )
     assert block.status_code == 201
-    await make_appointment(db, pro.professional_id, service["id"], starts_at)
+    appointment = await make_appointment(
+        db, pro.professional_id, service["id"], starts_at
+    )
+    appointment.idempotency_key = IDEMPOTENCY_KEY
+    appointment.idempotency_fingerprint = "fingerprint-de-teste"
+    await db.commit()
     return Scene(
+        appointment_id=appointment.id,
         business_id=(await get_business(db)).id,
         other_business_id=(await get_business(db, "outro-negocio")).id,
         professional_id=UUID(pro.professional_id),
@@ -118,6 +128,44 @@ READERS: dict[str, Reader] = {
     ),
     "professionals.list_service_ids": lambda db, business_id, s: (
         professionals.list_service_ids(db, business_id)
+    ),
+    "professionals.list_eligible": lambda db, business_id, s: (
+        professionals.list_eligible(db, business_id, s.service_id)
+    ),
+    "professionals.list_public_links": lambda db, business_id, s: (
+        professionals.list_public_links(db, business_id)
+    ),
+    "catalog.list_active": lambda db, business_id, s: catalog.list_active(
+        db, business_id
+    ),
+    "time_blocks.busy_periods": lambda db, business_id, s: time_blocks.busy_periods(
+        db,
+        business_id,
+        [s.professional_id],
+        s.starts_at,
+        s.starts_at + timedelta(hours=2),
+    ),
+    "appointments.busy_periods": lambda db, business_id, s: appointments.busy_periods(
+        db,
+        business_id,
+        [s.professional_id],
+        s.starts_at,
+        s.starts_at + timedelta(hours=2),
+    ),
+    "appointments.count_by_professional": lambda db, business_id, s: (
+        appointments.count_by_professional(
+            db,
+            business_id,
+            [s.professional_id],
+            s.starts_at,
+            s.starts_at + timedelta(hours=2),
+        )
+    ),
+    "appointments.lock": lambda db, business_id, s: appointments.lock(
+        db, business_id, s.appointment_id
+    ),
+    "appointments.get_by_idempotency_key": lambda db, business_id, s: (
+        appointments.get_by_idempotency_key(db, business_id, IDEMPOTENCY_KEY)
     ),
     "catalog.list_all": lambda db, business_id, s: catalog.list_all(db, business_id),
     "catalog.get": lambda db, business_id, s: catalog.get(
@@ -202,6 +250,18 @@ async def try_to_lock(engine: AsyncEngine, professional_id: UUID) -> None:
             .where(Professional.id == professional_id)
             .with_for_update(nowait=True)
         )
+
+
+async def test_locking_many_professionals_stays_in_the_business(
+    db: AsyncSession, engine: AsyncEngine, scene: Scene
+) -> None:
+    await professionals.lock_many(db, scene.other_business_id, [scene.professional_id])
+    await try_to_lock(engine, scene.professional_id)
+    await db.rollback()
+
+    await professionals.lock_many(db, scene.business_id, [scene.professional_id])
+    with raises(DBAPIError):
+        await try_to_lock(engine, scene.professional_id)
 
 
 async def test_locking_all_professionals_stays_in_the_business(

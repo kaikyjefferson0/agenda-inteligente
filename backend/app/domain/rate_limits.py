@@ -19,6 +19,11 @@ PASSWORD_FORGOT_BY_IP = RateLimit("password_forgot_ip", 5, timedelta(hours=1))
 REGISTER_BY_IP = RateLimit("register_ip", 5, timedelta(hours=1))
 ACCOUNT_TOKEN_BY_IP = RateLimit("account_token_ip", 10, timedelta(hours=1))
 INVITATIONS_BY_BUSINESS = RateLimit("invitations_business", 20, timedelta(hours=1))
+PUBLIC_BUSINESS_BY_IP = RateLimit("public_business_ip", 120, timedelta(minutes=1))
+PUBLIC_AVAILABILITY_BY_IP = RateLimit(
+    "public_availability_ip", 120, timedelta(minutes=1)
+)
+PUBLIC_BOOKING_BY_IP = RateLimit("public_booking_ip", 10, timedelta(hours=1))
 
 
 def window_start(now: datetime, window: timedelta) -> datetime:

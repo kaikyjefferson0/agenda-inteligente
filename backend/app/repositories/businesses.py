@@ -10,6 +10,11 @@ async def get_by_id(session: AsyncSession, business_id: UUID) -> Business | None
     return await session.get(Business, business_id)
 
 
+async def get_by_slug(session: AsyncSession, slug: str) -> Business | None:
+    """The public entry point. The column is citext, so case does not matter."""
+    return await session.scalar(select(Business).where(Business.slug == slug))
+
+
 async def lock_by_id(session: AsyncSession, business_id: UUID) -> Business | None:
     """FOR NO KEY UPDATE: inserts that reference the business must not wait.
 

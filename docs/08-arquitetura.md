@@ -141,6 +141,7 @@ O IP vem apenas do cabeçalho definido em `TRUSTED_CLIENT_IP_HEADER`, usando o v
 |---|---|
 | Criar agendamento público | 10 por hora, por IP |
 | Consultar disponibilidade | 120 por minuto, por IP |
+| Página pública do negócio | 120 por minuto, por IP |
 | Rotas com token de cliente | 60 por minuto, por IP |
 | Login | 10 por 15 minutos, por combinação de IP e e-mail |
 | Login | 50 por 15 minutos, por IP |

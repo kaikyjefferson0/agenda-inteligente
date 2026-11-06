@@ -50,6 +50,14 @@ PROBLEMS: dict[ErrorCode, Problem] = {
     ErrorCode.NOT_FOUND: Problem(
         404, "Não encontrado", "O recurso solicitado não foi encontrado."
     ),
+    ErrorCode.SLOT_UNAVAILABLE: Problem(
+        409, "Horário indisponível", "Este horário acabou de ser reservado."
+    ),
+    ErrorCode.IDEMPOTENCY_KEY_REUSED: Problem(
+        409,
+        "Chave de idempotência já usada",
+        "Esta chave já foi usada com dados diferentes.",
+    ),
     ErrorCode.APPOINTMENT_CONFLICTS: Problem(
         409,
         "Agendamentos em conflito",
@@ -120,7 +128,11 @@ def _app_error_extra(error: AppError) -> dict[str, Any]:
     if error.invalid_field is not None:
         field, message = error.invalid_field
         extra["errors"] = [
-            {"loc": ["body", field], "msg": message, "type": "value_error"}
+            {
+                "loc": [error.invalid_location, field],
+                "msg": message,
+                "type": "value_error",
+            }
         ]
     return extra
 

@@ -7,6 +7,7 @@ from app.api.catalog import router as catalog_router
 from app.api.errors import register_error_handlers
 from app.api.health import router as health_router
 from app.api.professionals import router as professionals_router
+from app.api.public import router as public_router
 from app.api.time_blocks import router as time_blocks_router
 from app.core.config import get_settings
 
@@ -33,3 +34,4 @@ app.include_router(business_router, prefix=API_PREFIX)
 app.include_router(catalog_router, prefix=API_PREFIX)
 app.include_router(professionals_router, prefix=API_PREFIX)
 app.include_router(time_blocks_router, prefix=API_PREFIX)
+app.include_router(public_router, prefix=API_PREFIX)

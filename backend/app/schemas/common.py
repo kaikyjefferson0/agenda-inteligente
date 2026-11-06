@@ -12,8 +12,17 @@ def _validate_timezone(value: str) -> str:
     return value
 
 
+def reject_null_character(value: str) -> str:
+    """PostgreSQL text cannot hold it, so it would otherwise end as a 500."""
+    if "\x00" in value:
+        raise ValueError("must not contain a null character")
+    return value
+
+
 Name = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+    AfterValidator(reject_null_character),
 ]
 Slug = Annotated[
     str, StringConstraints(min_length=3, max_length=63, pattern=SLUG_PATTERN)

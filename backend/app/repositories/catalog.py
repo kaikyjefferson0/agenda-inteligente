@@ -16,6 +16,15 @@ async def list_all(session: AsyncSession, business_id: UUID) -> list[Service]:
     return list(rows)
 
 
+async def list_active(session: AsyncSession, business_id: UUID) -> list[Service]:
+    rows = await session.scalars(
+        select(Service)
+        .where(Service.business_id == business_id, Service.is_active)
+        .order_by(Service.name, Service.id)
+    )
+    return list(rows)
+
+
 async def get(
     session: AsyncSession, business_id: UUID, service_id: UUID
 ) -> Service | None:

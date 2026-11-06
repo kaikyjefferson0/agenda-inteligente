@@ -27,9 +27,9 @@ O engenheiro responsável aprovou as decisões principais durante a Fase 0. Os p
 
 | Ponto | Definição adotada | Onde | Situação |
 |---|---|---|---|
-| Valores do passo da grade | 5, 10, 15, 20, 30 ou 60 minutos | RN01 | A revisar |
-| Alinhamento da grade | Múltiplos do passo contados da meia-noite local | RN02 | A revisar |
-| Horário local ambíguo em mudança de fuso | Usa a primeira ocorrência; horário inexistente é descartado | RN06 | A revisar |
+| Valores do passo da grade | 5, 10, 15, 20, 30 ou 60 minutos | RN01 | Resolvido na etapa de agendamento público |
+| Alinhamento da grade | Múltiplos do passo contados da meia-noite local | RN02 | Resolvido na etapa de agendamento público |
+| Horário local ambíguo em mudança de fuso | Usa a primeira ocorrência; horário inexistente é descartado. Os testes de mudança de fuso usam `America/New_York` | RN06, CT05 | Resolvido na etapa de agendamento público |
 | Status finais | `cancelled`, `completed` e `no_show` não mudam mais | RN15 | A revisar |
 | Validade do link do cliente | Até 30 dias depois do início do atendimento | RN16 | A revisar |
 | Remarcação | Mantém o serviço, e o profissional pode mudar | RN18 | A revisar |
@@ -57,8 +57,26 @@ O engenheiro responsável aprovou as decisões principais durante a Fase 0. Os p
 | `EMAIL_IN_USE` no cadastro e no convite | Revela que o e-mail existe; aceito, com limites por IP e por negócio | API | A revisar |
 | Restrições da demo | Nome do negócio, `slug` e nome dos serviços travados; criação de serviços recusada; convites e recuperação de senha desligados | RN28 | A revisar |
 | Conteúdo dos e-mails | Sem texto livre digitado pelo cliente | RN25 | A revisar |
-| Valores dos limites de taxa | Valores iniciais na tabela da Arquitetura; os de login por IP, cadastro, redefinição, aceite e convites foram aprovados na Fase 3 | Arquitetura | A revisar |
-| Reenvio com `Idempotency-Key` | Devolve o agendamento sem o link, que fica disponível apenas por e-mail; se o limite de e-mail impediu o envio na criação, gera um novo link e invalida o anterior | RN13, RN26 | A revisar |
+| Valores dos limites de taxa | Os valores da tabela da Arquitetura | Arquitetura | Resolvido na etapa de agendamento público |
+| Reenvio com `Idempotency-Key` | Devolve o agendamento sem o link, que fica disponível apenas por e-mail; se o limite de e-mail impediu o envio na criação, gera um novo link e invalida o anterior | RN13, RN26 | Resolvido na etapa de agendamento público |
+| D1. Formatos da página pública e da disponibilidade | `GET /public/businesses/{slug}` e `availability` nos formatos da API, sem e-mail, preparo nem o profissional de cada horário; instantes com o deslocamento do fuso do negócio | UC10, API | A revisar |
+| D2. Horário fora da grade na reserva pública | `422 VALIDATION_ERROR` em `starts_at`, inclusive a segunda ocorrência de um horário ambíguo. A lista de `SLOT_UNAVAILABLE` não muda: fora da antecedência, ocupado ou fora do expediente seguem como `409` | RN02, RN06, UC11, API | A revisar |
+| D3. Serviço inativo nas rotas públicas | `404`, igual a inexistente, porque o lado público só conhece serviços ativos | RN07, UC10, UC11, API | A revisar |
+| D4. Profissional nas rotas públicas | Inexistente ou de outro negócio: `404`. Sem o serviço ou com `is_bookable = false`: `422`, na disponibilidade e na reserva | RN07, UC10, UC11, CT08, API | A revisar |
+| D5. Limite da página pública | A tabela era omissa; a rota tem contador próprio de 120 por minuto por IP | Arquitetura, API | A revisar |
+| D6. O que conta nos limites públicos | Toda requisição, inclusive repetições, `404` e `422`. A exceção é JSON malformado, recusado pelo framework antes da contagem e sem acessar o banco | CT22, Arquitetura | A revisar |
+| D7. Formato da `Idempotency-Key` | UUID com hifens, de qualquer versão; ausente ou inválida responde `422`; maiúsculas e minúsculas contam como a mesma chave | RN13, API | A revisar |
+| D8. Dados do fingerprint | Serviço, profissional, instante com o deslocamento enviado, nome, e-mail e telefone, depois de validados. O mesmo instante com outro deslocamento e o e-mail com outra caixa contam como dados diferentes e são recusados | RN13, CT24 | A revisar |
+| D9. Validação do cliente | Nome de 1 a 120 caracteres, sem caracteres de controle; e-mail validado; telefone em E.164, com o frontend convertendo o que for digitado | RN12, UC11, API | A revisar |
+| D10. Conteúdo do e-mail de criação | Link, negócio, serviço, profissional e horário local, sem o nome do cliente | RN25 | A revisar |
+| D11. Troca do link em repetição | Ocorre sempre que `link_email_skipped = true`, a cada repetição e em qualquer status, como na RN13; a marca não volta a `false` | RN13, RN26, CT36 | A revisar |
+| D12. "Cadastro mais antigo" | `professionals.created_at` | RN10, CT07 | A revisar |
+| D13. Antecedência máxima | `agora + N × 24 horas` exatas, como na fórmula da RN05 | RN05, CT04 | A revisar |
+| D14. Aptos sem horários | Profissional apto sem expediente aparece e não tem horários; serviço ativo sem profissional aparece e não tem horários | RN07, UC10 | A revisar |
+| D15. Reservas no negócio demo | Funcionam normalmente, com os limites de e-mail, porque a RN28 não as restringe | RN26, RN28 | A revisar |
+| D16. Bloco na hora repetida | O bloco inteiro precisa ficar no intervalo, minuto a minuto, e não só nas pontas: sai se passar do fim do intervalo e volta, e cabe se terminar no instante em que o relógio volta ao início dele. Vale também para a lista da RN22 | RN03, RN06, RN22, CT05 | A revisar |
+| Caractere nulo em texto | Recusado com `422` em `Name` e no motivo do bloqueio, porque o PostgreSQL não o aceita; `slug` com esse caractere responde `404` | API | A revisar |
+| Parte do CT10 e do CT36 sem rota | A parte "ao remarcar" do CT10 e o `404` do link anterior no CT36 dependem das rotas do link do cliente. Até lá, o CT36 confere o hash guardado | CT10, CT36 | Pendente para a Parte B |
 | Casos de teste CT23 a CT36 | Acrescentados para cobrir decisões posteriores à aprovação de CT01 a CT22 | Casos de teste | A revisar |
 | `business_id` em `working_hours` e `time_blocks` | Acrescentado para aplicar as chaves compostas aprovadas | Modelo de dados | A revisar |
 | Tipos de campos opcionais sem `null` nos schemas de `PATCH` | `cast` no default, lidos com `model_dump(exclude_unset=True)` | API | A revisar |

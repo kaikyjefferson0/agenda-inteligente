@@ -1,9 +1,12 @@
+from collections import defaultdict
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.availability import BusyPeriod
 from app.domain.schedule import AppointmentSummary
 from app.models import Appointment, AppointmentStatus
 
@@ -62,4 +65,80 @@ async def list_occupying(
             Appointment.starts_at < ends_at,
             Appointment.blocked_until > starts_at,
         ),
+    )
+
+
+async def busy_periods(
+    session: AsyncSession,
+    business_id: UUID,
+    professional_ids: Sequence[UUID],
+    starts_at: datetime,
+    ends_at: datetime,
+) -> dict[UUID, list[BusyPeriod]]:
+    """RN04: every status but cancelled occupies [starts_at, blocked_until)."""
+    rows = await session.execute(
+        select(
+            Appointment.professional_id,
+            Appointment.starts_at,
+            Appointment.blocked_until,
+        ).where(
+            Appointment.business_id == business_id,
+            Appointment.professional_id.in_(professional_ids),
+            Appointment.status != AppointmentStatus.CANCELLED,
+            Appointment.starts_at < ends_at,
+            Appointment.blocked_until > starts_at,
+        )
+    )
+    periods: dict[UUID, list[BusyPeriod]] = defaultdict(list)
+    for professional_id, period_start, period_end in rows:
+        periods[professional_id].append(BusyPeriod(period_start, period_end))
+    return periods
+
+
+async def count_by_professional(
+    session: AsyncSession,
+    business_id: UUID,
+    professional_ids: Sequence[UUID],
+    starts_at: datetime,
+    ends_at: datetime,
+) -> dict[UUID, int]:
+    """RN10: appointments that are not cancelled and start in the period."""
+    rows = await session.execute(
+        select(Appointment.professional_id, func.count())
+        .where(
+            Appointment.business_id == business_id,
+            Appointment.professional_id.in_(professional_ids),
+            Appointment.status != AppointmentStatus.CANCELLED,
+            Appointment.starts_at >= starts_at,
+            Appointment.starts_at < ends_at,
+        )
+        .group_by(Appointment.professional_id)
+    )
+    return {professional_id: count for professional_id, count in rows}
+
+
+async def get_by_idempotency_key(
+    session: AsyncSession, business_id: UUID, idempotency_key: str
+) -> Appointment | None:
+    return await session.scalar(
+        select(Appointment)
+        .where(
+            Appointment.business_id == business_id,
+            Appointment.idempotency_key == idempotency_key,
+        )
+        .execution_options(populate_existing=True)
+    )
+
+
+async def lock(
+    session: AsyncSession, business_id: UUID, appointment_id: UUID
+) -> Appointment | None:
+    return await session.scalar(
+        select(Appointment)
+        .where(
+            Appointment.business_id == business_id,
+            Appointment.id == appointment_id,
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
     )

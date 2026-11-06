@@ -13,7 +13,7 @@ from pydantic import (
 
 from app.domain.schedule import has_overlapping_intervals
 from app.models import AppointmentStatus
-from app.schemas.common import RequestModel, ResponseModel
+from app.schemas.common import RequestModel, ResponseModel, reject_null_character
 
 
 def _validate_local_time(value: time) -> time:
@@ -38,7 +38,9 @@ LocalTime = Annotated[
 ]
 UtcInstant = Annotated[AwareDatetime, AfterValidator(_to_utc)]
 BlockReason = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+    AfterValidator(reject_null_character),
 ]
 
 
