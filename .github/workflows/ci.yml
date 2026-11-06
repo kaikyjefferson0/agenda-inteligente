@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-lint:
+    name: Backend (Ruff e mypy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.7"
+          enable-cache: true
+      - name: Instalar dependências
+        run: uv sync --locked
+      - name: Ruff (lint)
+        run: uv run ruff check .
+      - name: Ruff (formatação)
+        run: uv run ruff format --check .
+      - name: mypy
+        run: uv run mypy
+
+  backend-tests:
+    name: Backend (migrações e testes)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      db:
+        image: postgres:18.6-alpine
+        env:
+          POSTGRES_USER: agenda
+          POSTGRES_PASSWORD: agenda_ci
+          POSTGRES_DB: agenda
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agenda -d agenda"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://agenda:agenda_ci@localhost:5432/agenda
+      JWT_SECRET: somente-ci-nao-usar-em-producao-0001
+      RATE_LIMIT_KEY_SECRET: somente-ci-nao-usar-em-producao-0002
+      CORS_ALLOWED_ORIGINS: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.7"
+          enable-cache: true
+      - name: Instalar dependências
+        run: uv sync --locked
+      - name: Aplicar migrações do zero
+        run: uv run alembic upgrade head
+      - name: Conferir modelos e migrações
+        run: uv run alembic check
+      - name: Testes com cobertura (mínimo de 80%)
+        run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=80
+      - name: Cobertura das regras de domínio (mínimo de 90%)
+        run: uv run coverage report --include="app/domain/*" --fail-under=90
+
+  frontend:
+    name: Frontend (ESLint, tsc e build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependências
+        run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: tsc e build
+        run: npm run build
+
+  docker:
+    name: Imagens Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build da imagem do backend
+        run: docker build ./backend
+      - name: Build da imagem do frontend
+        run: docker build ./frontend
+        

@@ -36,9 +36,11 @@ async def verify_password(stored_hash: str | None, password: str) -> bool:
     the response time does not reveal whether the account exists.
     """
     global _dummy_hash
-    if stored_hash is None and _dummy_hash is None:
-        _dummy_hash = await hash_password(secrets.token_urlsafe(OPAQUE_TOKEN_BYTES))
-    candidate = stored_hash if stored_hash is not None else _dummy_hash
+    candidate = stored_hash
+    if candidate is None:
+        if _dummy_hash is None:
+            _dummy_hash = await hash_password(secrets.token_urlsafe(OPAQUE_TOKEN_BYTES))
+        candidate = _dummy_hash
     try:
         await to_thread.run_sync(_hasher.verify, candidate, password)
     except VerificationError, InvalidHashError:

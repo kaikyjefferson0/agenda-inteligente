@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from http import HTTPStatus
 from typing import Any
@@ -97,7 +98,7 @@ def problem_response(
     code: ErrorCode,
     *,
     extra: dict[str, Any] | None = None,
-    headers: dict[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     problem = PROBLEMS[code]
     body = _problem_body(code, problem.status, problem.title, problem.detail)

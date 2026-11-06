@@ -24,9 +24,11 @@ TimeZoneName = Annotated[str, AfterValidator(_validate_timezone)]
 class RequestModel(BaseModel):
     """Refuses unknown fields, such as a business_id sent by the client.
 
-    In a partial update, declare `name: Name = Field(default=None)`: the field
-    may be left out, but an explicit null fails, and the routes apply only what
-    `model_dump(exclude_unset=True)` returns.
+    In a partial update, declare `name: Name = Field(default=cast(Name, None))`:
+    the field may be left out, but an explicit null fails, and the routes apply
+    only what `model_dump(exclude_unset=True)` returns. The cast exists only for
+    the type checker: an omitted field holds None at runtime, so read these
+    models through `model_dump`, never through their attributes.
     """
 
     model_config = ConfigDict(extra="forbid")

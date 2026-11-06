@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, cast
 from uuid import UUID
 
 from pydantic import Field
@@ -23,11 +23,11 @@ class CreateServiceRequest(RequestModel):
 
 
 class UpdateServiceRequest(RequestModel):
-    name: Name = Field(default=None)
-    duration_minutes: Duration = Field(default=None)
-    preparation_minutes: Preparation = Field(default=None)
-    price_cents: Price = Field(default=None)
-    is_active: bool = Field(default=None)
+    name: Name = Field(default=cast(Name, None))
+    duration_minutes: Duration = Field(default=cast(Duration, None))
+    preparation_minutes: Preparation = Field(default=cast(Preparation, None))
+    price_cents: Price = Field(default=cast(Price, None))
+    is_active: bool = Field(default=cast(bool, None))
 
 
 class ServiceData(ResponseModel):
