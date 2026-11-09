@@ -55,6 +55,8 @@ services:
     build: ./frontend
     environment:
       VITE_USE_POLLING: "true"
+      # D52: Vite forwards /api to the API, so both stay on the same origin.
+      VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://api:8000}
     ports:
       - "5173:5173"
     volumes:

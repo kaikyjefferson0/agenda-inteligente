@@ -76,9 +76,12 @@ jobs:
         run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=80
       - name: Cobertura das regras de domínio (mínimo de 90%)
         run: uv run coverage report --include="app/domain/*" --fail-under=90
+      # D51: the OpenAPI used by the frontend must match the API.
+      - name: Conferir o openapi.json do frontend
+        run: uv run python -m app.scripts.export_openapi --check ../frontend/src/api/openapi.json
 
   frontend:
-    name: Frontend (ESLint, tsc e build)
+    name: Frontend (ESLint, tsc, Vitest e build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -94,7 +97,16 @@ jobs:
         run: npm ci
       - name: ESLint
         run: npm run lint
-      - name: tsc e build
+      - name: tsc
+        run: npm run typecheck
+      - name: Testes com cobertura (mínimo de 80% em src/lib e src/api)
+        run: npm run test:coverage
+      # D51: the types must be regenerated whenever openapi.json changes.
+      - name: Conferir o schema.d.ts
+        run: |
+          npm run api:types
+          git diff --exit-code -- src/api/schema.d.ts
+      - name: Build
         run: npm run build
 
   docker:

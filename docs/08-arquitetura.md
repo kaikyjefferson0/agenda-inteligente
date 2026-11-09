@@ -64,7 +64,7 @@ Uma função pura recebe a configuração, os intervalos de expediente, os perí
 
 ## Frontend
 
-Vite, React, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, React Hook Form e Zod. Os tipos da API são gerados a partir do OpenAPI.
+Vite, React, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, React Hook Form e Zod. Os tipos da API são gerados a partir do OpenAPI. Estrutura, rotas, cliente da API, identidade visual e testes estão em [Frontend](09-frontend.md).
 
 O token de acesso fica somente em memória. Ao recarregar a página, o frontend chama `/auth/refresh`.
 
@@ -205,11 +205,11 @@ Em cada pull request:
 1. **Backend:** Ruff e mypy.
 2. **Testes do backend:** pytest com PostgreSQL e os limites de cobertura de 90% e 80%.
 3. **Migrações:** aplica do zero e confere se os modelos estão sincronizados com elas.
-4. **Frontend:** ESLint, `tsc` e Vitest.
+4. **Frontend:** ESLint, `tsc`, Vitest com cobertura e build.
 5. **Ponta a ponta:** Playwright nos fluxos E2E01 e E2E02.
 6. **Imagens:** build das imagens Docker.
 
-Os itens 1, 2, 3 e 6, além do ESLint e do `tsc` do item 4, já rodam em `.github/workflows/ci.yml`. O Vitest e o Playwright entram na etapa do frontend, junto com os primeiros testes e os fluxos E2E01 e E2E02.
+Os itens 1, 2, 3, 4 e 6 já rodam em `.github/workflows/ci.yml`, junto com a conferência do contrato da API (D51). O Playwright entra com os fluxos E2E01 e E2E02.
 
 ## Deploy
 

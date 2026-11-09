@@ -2,7 +2,7 @@
 
 Sistema de agendamento online para negócios de beleza e bem-estar. Projeto de portfólio full stack, com a documentação em [`docs/`](docs/README.md).
 
-**Estado atual:** o backend está completo. Ele cobre:
+**Estado atual:** o backend está completo, e o frontend começou. O backend cobre:
 
 - **Autenticação:** cadastro do negócio e do Dono, login, logout, renovação de sessão, convite de profissional e recuperação de senha.
 - **Configuração:** definições do negócio, serviços, equipe, serviços de cada profissional, expediente semanal e bloqueios.
@@ -12,7 +12,7 @@ Sistema de agendamento online para negócios de beleza e bem-estar. Projeto de p
 - **Envio de e-mails:** worker com retentativas, Mailpit no desenvolvimento e Resend em produção.
 - **Restauração da demo:** tarefa que recria o negócio de demonstração com datas atuais.
 
-O frontend é a próxima etapa. O projeto tem CI no GitHub Actions, que roda em todo pull request para a `main`.
+O frontend tem a base pronta: rotas com carregamento sob demanda, página inicial, página 404 e páginas provisórias, cliente tipado da API gerado do OpenAPI, identidade visual com modo claro e escuro e testes com Vitest. As telas de cada fluxo são as próximas etapas; os detalhes estão em [`docs/09-frontend.md`](docs/09-frontend.md). O projeto tem CI no GitHub Actions, que roda em todo pull request para a `main`.
 
 ## Pré-requisitos
 
@@ -104,8 +104,18 @@ docker compose exec api coverage report --include="app/domain/*" --fail-under=90
 
 # Frontend
 docker compose exec frontend npm run lint
+docker compose exec frontend npm run typecheck
+docker compose exec frontend npm run test
+# Testes com cobertura: mínimo de 80% em src/lib e src/api
+docker compose exec frontend npm run test:coverage
 docker compose exec frontend npm run build
+
+# Contrato da API: depois de mudar uma rota, exporte o OpenAPI e gere os tipos do frontend
+docker compose exec -T api python -m app.scripts.export_openapi - > frontend/src/api/openapi.json
+docker compose exec frontend npm run api:types
 ```
+
+Os dois arquivos do contrato, `frontend/src/api/openapi.json` e `frontend/src/api/schema.d.ts`, são versionados, e o CI falha se algum estiver desatualizado. Em desenvolvimento, o Vite repassa `/api` para a API, então as chamadas do frontend saem da mesma origem, `http://localhost:5173/api/v1/...`.
 
 O `coverage report` usa os dados gravados pelo `pytest --cov`, então rode-o depois dele.
 
@@ -133,9 +143,12 @@ A arquitetura está descrita em [`docs/08-arquitetura.md`](docs/08-arquitetura.m
 | pytest-cov | 7.0.0 |
 | Node | 24 |
 | React | 19.3.1 |
+| React Router | 8.5.1 |
+| TanStack Query | 5.107.1 |
+| Vitest | 5.1.0 |
 | Vite | 8.3.6 |
 | TypeScript | 6.0.3 |
 | Tailwind CSS | 4.3.4 |
 | PostgreSQL | 18.6 |
 
-O TypeScript fica na 6.0 porque o `typescript-eslint` 8.72.1 ainda não aceita a 7.
+O TypeScript fica na 6.0 porque o `typescript-eslint` 8.72.1 ainda não aceita a 7. O `openapi-typescript` 7.13.0 declara suporte só ao TypeScript 5, então um `overrides` no `package.json` o faz usar o 6.0 do projeto.
