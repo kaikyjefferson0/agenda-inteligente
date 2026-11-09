@@ -1,9 +1,13 @@
+import unicodedata
 from typing import Annotated
 from zoneinfo import available_timezones
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, StringConstraints
 
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+# E.164, as in the example of the API document. The frontend converts what is typed.
+PHONE_PATTERN = r"^\+[1-9][0-9]{7,14}$"
+CONTROL_CHARACTER_CATEGORY = "Cc"
 
 
 def _validate_timezone(value: str) -> str:
@@ -28,6 +32,17 @@ Slug = Annotated[
     str, StringConstraints(min_length=3, max_length=63, pattern=SLUG_PATTERN)
 ]
 TimeZoneName = Annotated[str, AfterValidator(_validate_timezone)]
+
+
+def _reject_control_characters(value: str) -> str:
+    if any(unicodedata.category(char) == CONTROL_CHARACTER_CATEGORY for char in value):
+        raise ValueError("must not contain control characters")
+    return value
+
+
+# D9: the customer data of the public page and of the team's manual booking.
+CustomerName = Annotated[Name, AfterValidator(_reject_control_characters)]
+CustomerPhone = Annotated[str, StringConstraints(pattern=PHONE_PATTERN)]
 
 
 class RequestModel(BaseModel):

@@ -24,20 +24,20 @@ class WorkingHoursUpdate:
     appointments_outside_hours: list[AppointmentSummary]
 
 
-def _ensure_can_manage(viewer: User, professional: Professional) -> None:
+def ensure_can_manage(viewer: User, professional: Professional) -> None:
     """Runs after the lookup by business, so another business only ever sees 404."""
     if viewer.role is UserRole.OWNER or professional.user_id == viewer.id:
         return
     raise AppError(ErrorCode.FORBIDDEN)
 
 
-async def _get_manageable(
+async def get_manageable(
     session: AsyncSession, viewer: User, professional_id: UUID
 ) -> Professional:
     professional = await professionals.get(session, viewer.business_id, professional_id)
     if professional is None:
         raise AppError(ErrorCode.NOT_FOUND)
-    _ensure_can_manage(viewer, professional)
+    ensure_can_manage(viewer, professional)
     return professional
 
 
@@ -64,7 +64,7 @@ async def find_appointments_outside_hours(
 async def get_working_hours(
     session: AsyncSession, *, viewer: User, professional_id: UUID
 ) -> list[WorkingHours]:
-    await _get_manageable(session, viewer, professional_id)
+    await get_manageable(session, viewer, professional_id)
     return await working_hours.list_for_professional(
         session, viewer.business_id, professional_id
     )
@@ -81,7 +81,7 @@ async def replace_working_hours(
 ) -> WorkingHoursUpdate:
     """RN22: always accepted. Appointments stay, and those left out are listed."""
     business_id = viewer.business_id
-    await _get_manageable(session, viewer, professional_id)
+    await get_manageable(session, viewer, professional_id)
     await _lock_professional(session, business_id, professional_id)
 
     await working_hours.replace(session, business_id, professional_id, intervals)
@@ -101,7 +101,7 @@ async def replace_working_hours(
 async def list_time_blocks(
     session: AsyncSession, *, viewer: User, professional_id: UUID
 ) -> list[TimeBlock]:
-    await _get_manageable(session, viewer, professional_id)
+    await get_manageable(session, viewer, professional_id)
     return await time_blocks.list_for_professional(
         session, viewer.business_id, professional_id
     )
@@ -117,7 +117,7 @@ async def create_time_block(
     reason: str,
 ) -> TimeBlock:
     business_id = viewer.business_id
-    await _get_manageable(session, viewer, professional_id)
+    await get_manageable(session, viewer, professional_id)
     await _lock_professional(session, business_id, professional_id)
 
     conflicts = await appointments.list_occupying(
@@ -152,7 +152,7 @@ async def delete_time_block(
     if block is None:
         raise AppError(ErrorCode.NOT_FOUND)
     professional_id = block.professional_id
-    await _get_manageable(session, viewer, professional_id)
+    await get_manageable(session, viewer, professional_id)
     await _lock_professional(session, business_id, professional_id)
 
     # A simultaneous call may have removed it while this one waited for the lock.
