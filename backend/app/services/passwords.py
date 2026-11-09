@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,7 +59,10 @@ async def forgot_password(
         {
             "url": f"{settings.frontend_base_url}/recuperar-senha/{raw_token}",
             "business_name": business.name,
-            "expires_at": expires_at.isoformat(),
+            # D37: local time, with the offset, like the appointments.
+            "expires_at": expires_at.astimezone(
+                ZoneInfo(business.timezone)
+            ).isoformat(),
         },
     )
     await session.commit()

@@ -17,7 +17,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-A API não sobe se `JWT_SECRET` ou `RATE_LIMIT_KEY_SECRET` tiverem menos de 32 caracteres. Se o seu `.env` for anterior à autenticação, troque esses dois valores, por exemplo com `openssl rand -hex 32`, e recrie o container da API.
+A API não sobe se `JWT_SECRET` ou `RATE_LIMIT_KEY_SECRET` tiverem menos de 32 caracteres. Se o seu `.env` for anterior à autenticação, troque esses dois valores, por exemplo com `openssl rand -hex 32`, e recrie o container da API. Se ele for anterior ao worker de e-mails, troque `EMAIL_BACKEND=console` por `EMAIL_BACKEND=smtp`, porque o `console` não existe mais.
 
 | Serviço | Endereço |
 |---|---|
@@ -26,6 +26,7 @@ A API não sobe se `JWT_SECRET` ou `RATE_LIMIT_KEY_SECRET` tiverem menos de 32 c
 | Documentação da API | <http://localhost:8000/docs> |
 | Verificação da API e do banco | <http://localhost:8000/health> |
 | PostgreSQL | `localhost:5433` |
+| E-mails enviados (Mailpit) | <http://localhost:8025> |
 
 O PostgreSQL usa a porta 5433 no host para não conflitar com uma instalação local na 5432.
 
@@ -89,7 +90,7 @@ frontend/   SPA com Vite, React, TypeScript, Tailwind e shadcn/ui
 docs/       Documentação do produto e da arquitetura
 ```
 
-A arquitetura está descrita em [`docs/08-arquitetura.md`](docs/08-arquitetura.md). O serviço `worker` será adicionado ao Compose quando existir o envio de e-mails.
+A arquitetura está descrita em [`docs/08-arquitetura.md`](docs/08-arquitetura.md). O serviço `worker` envia os e-mails da fila; em desenvolvimento, eles chegam ao Mailpit. Ele não recarrega sozinho: depois de mudar o código do backend, rode `docker compose restart worker`.
 
 ## Versões
 

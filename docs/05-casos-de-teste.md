@@ -107,6 +107,12 @@ O merge é bloqueado abaixo de:
 | CT29 | Restauração da demo | Dados demo recriados com datas atuais; outros negócios intactos | Integração |
 | CT30 | Worker com falha temporária ou dois workers simultâneos | Reenvia com espera crescente; dois workers não pegam a mesma mensagem | Integração |
 | CT32 | Negócio demo tenta alterar campos travados, criar serviço, convidar ou recuperar senha | Alterações e convite recusados com `DEMO_RESTRICTED`; recuperação responde `202`; nenhum e-mail é enfileirado | Integração |
+| CT57 | Os 5 templates de e-mail, inclusive com nomes contendo `<script>` | Assunto, texto e HTML sem o nome do cliente, com o horário no fuso do negócio e os nomes escapados no HTML (D37) | Unidade |
+| CT58 | Mensagem enviada; mensagem que falha 5 vezes | A enviada fica `sent`, com `sent_at` e `payload` nulo; a que falha fica `failed`, com `last_error` e `payload` nulo (D39) | Integração |
+| CT59 | Falha permanente do provedor | `failed` na primeira tentativa, sem retentativa (D39) | Integração |
+| CT60 | Mensagem reservada por um worker que caiu | Volta a ser enviada depois que a reserva vence (D38) | Integração |
+| CT61 | Mensagem pendente há mais de 24 horas | `failed` com `"expired"`, sem chamar o provedor (D39) | Integração |
+| CT62 | Logs do worker e `last_error` | Não contêm o destinatário, o link nem o token (D40) | Integração |
 
 ## Ponta a ponta
 
@@ -133,12 +139,12 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC08 | CT25 |
 | UC09 | CT17, CT31 |
 | UC10 | CT01, CT02, CT03, CT04, CT05 |
-| UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, CT36, E2E01 |
+| UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, CT36, CT57, E2E01 |
 | UC12 | CT11, CT36, CT49, CT50, E2E01 |
-| UC13 | CT03, CT12, CT47, CT48, CT49, E2E01 |
-| UC14 | CT10, CT12, CT13, CT14, CT47, CT48, CT49 |
+| UC13 | CT03, CT12, CT47, CT48, CT49, CT57, E2E01 |
+| UC14 | CT10, CT12, CT13, CT14, CT47, CT48, CT49, CT57 |
 | UC15 | CT20, CT51, CT55, E2E02 |
-| UC16 | CT15, CT16, CT35, CT52, CT54, CT55 |
-| UC17 | CT33, CT34, CT35, CT53, CT55, CT56 |
+| UC16 | CT15, CT16, CT35, CT52, CT54, CT55, CT57 |
+| UC17 | CT33, CT34, CT35, CT53, CT55, CT56, CT57 |
 | UC18 | CT34, CT55 |
-| Transversal | CT19, CT20, CT29 |
+| Transversal | CT19, CT20, CT29, CT58, CT59, CT60, CT61, CT62 |

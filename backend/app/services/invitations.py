@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,7 +117,10 @@ async def invite_professional(
         {
             "url": f"{settings.frontend_base_url}/convite/{raw_token}",
             "business_name": business.name,
-            "expires_at": expires_at.isoformat(),
+            # D37: local time, with the offset, like the appointments.
+            "expires_at": expires_at.astimezone(
+                ZoneInfo(business.timezone)
+            ).isoformat(),
         },
     )
     invitation = Invitation(professional.id, user.email, expires_at)
