@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -10,8 +10,10 @@ from app.core.config import Settings, get_settings
 from app.core.database import get_session
 from app.core.security import decode_access_token
 from app.domain.errors import AppError, ErrorCode
+from app.domain.rate_limits import RateLimit
 from app.models import Business, User, UserRole
 from app.repositories import refresh_tokens, users
+from app.services.rate_limits import enforce_rate_limit
 
 bearer_scheme = HTTPBearer(auto_error=False)
 UNKNOWN_CLIENT_IP = "unknown"
@@ -41,6 +43,17 @@ def get_client_ip(request: Request, settings: SettingsDep) -> str:
 
 
 ClientIpDep = Annotated[str, Depends(get_client_ip)]
+
+
+def limited_by_ip(limit: RateLimit) -> Any:
+    """A dependency, so that invalid requests and unknown resources count as well."""
+
+    async def enforce(
+        session: SessionDep, settings: SettingsDep, client_ip: ClientIpDep, now: NowDep
+    ) -> None:
+        await enforce_rate_limit(session, settings, limit, client_ip, now)
+
+    return Depends(enforce)
 
 
 def require_csrf_header(

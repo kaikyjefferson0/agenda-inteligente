@@ -1,15 +1,14 @@
 from datetime import date
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query, Response, status
+from fastapi import APIRouter, Header, Query, Response, status
 
-from app.api.deps import ClientIpDep, NowDep, SessionDep, SettingsDep
+from app.api.deps import NowDep, SessionDep, SettingsDep, limited_by_ip
 from app.domain.rate_limits import (
     PUBLIC_AVAILABILITY_BY_IP,
     PUBLIC_BOOKING_BY_IP,
     PUBLIC_BUSINESS_BY_IP,
-    RateLimit,
 )
 from app.schemas.public import (
     IDEMPOTENCY_KEY_PATTERN,
@@ -25,23 +24,11 @@ from app.schemas.public import (
 )
 from app.services import public_booking
 from app.services.public_booking import CustomerContact
-from app.services.rate_limits import enforce_rate_limit
 
 router = APIRouter(prefix="/public/businesses", tags=["public"])
 
 
-def _limited_by_ip(limit: RateLimit) -> Any:
-    """A dependency, so that invalid requests and unknown slugs count as well."""
-
-    async def enforce(
-        session: SessionDep, settings: SettingsDep, client_ip: ClientIpDep, now: NowDep
-    ) -> None:
-        await enforce_rate_limit(session, settings, limit, client_ip, now)
-
-    return Depends(enforce)
-
-
-@router.get("/{slug}", dependencies=[_limited_by_ip(PUBLIC_BUSINESS_BY_IP)])
+@router.get("/{slug}", dependencies=[limited_by_ip(PUBLIC_BUSINESS_BY_IP)])
 async def get_public_business(slug: str, session: SessionDep) -> PublicBusinessResponse:
     business = await public_booking.get_public_business(session, slug)
     return PublicBusinessResponse(
@@ -69,7 +56,7 @@ async def get_public_business(slug: str, session: SessionDep) -> PublicBusinessR
 
 
 @router.get(
-    "/{slug}/availability", dependencies=[_limited_by_ip(PUBLIC_AVAILABILITY_BY_IP)]
+    "/{slug}/availability", dependencies=[limited_by_ip(PUBLIC_AVAILABILITY_BY_IP)]
 )
 async def get_availability(
     slug: str,
@@ -97,7 +84,7 @@ async def get_availability(
     "/{slug}/appointments",
     status_code=status.HTTP_201_CREATED,
     responses={status.HTTP_200_OK: {"description": "Repetição idempotente"}},
-    dependencies=[_limited_by_ip(PUBLIC_BOOKING_BY_IP)],
+    dependencies=[limited_by_ip(PUBLIC_BOOKING_BY_IP)],
 )
 async def create_booking(
     slug: str,

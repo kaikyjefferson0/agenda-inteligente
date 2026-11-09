@@ -13,11 +13,14 @@ from app.services import public_booking
 from tests.auth.helpers import API, bearer
 from tests.configuration.helpers import Member, make_appointment
 from tests.public.helpers import (
+    book,
     booking_body,
+    cancel_link,
     count_appointments,
     count_emails,
     get_appointment,
     post_booking,
+    reschedule_link,
 )
 
 pytestmark = mark.anyio
@@ -275,3 +278,126 @@ async def test_exclusion_constraint_is_the_last_defense(
     assert response.json()["code"] == "SLOT_UNAVAILABLE"
     assert await count_appointments(db) == 1
     assert await count_emails(db) == 0
+
+
+async def test_two_simultaneous_reschedules_to_the_same_time_leave_one(
+    client: AsyncClient,
+    db: AsyncSession,
+    service: dict[str, Any],
+    pro: Member,
+    monday_10: datetime,
+) -> None:
+    first, first_token = await book(
+        client, service["id"], monday_10, professional_id=pro.professional_id
+    )
+    second_start = monday_10 + timedelta(hours=1)
+    second, second_token = await book(
+        client,
+        service["id"],
+        second_start,
+        professional_id=pro.professional_id,
+        email="segunda@example.com",
+    )
+    target = monday_10 + timedelta(hours=3)
+
+    responses = await asyncio.gather(
+        reschedule_link(
+            client, first_token, target, professional_id=pro.professional_id
+        ),
+        reschedule_link(
+            client, second_token, target, professional_id=pro.professional_id
+        ),
+    )
+
+    assert sorted(item.status_code for item in responses) == [200, 409]
+    refused = next(item for item in responses if item.status_code == 409)
+    assert refused.json()["code"] == "SLOT_UNAVAILABLE"
+    rows = [
+        await get_appointment(db, first.json()["id"]),
+        await get_appointment(db, second.json()["id"]),
+    ]
+    assert [row.starts_at == target for row in rows].count(True) == 1
+    originals = {first.json()["id"]: monday_10, second.json()["id"]: second_start}
+    kept = next(row for row in rows if row.starts_at != target)
+    assert kept.starts_at == originals[str(kept.id)]
+    assert await count_emails(db, "appointment_reschedule") == 1
+
+
+async def test_reschedule_and_booking_of_the_same_time_leave_one(
+    client: AsyncClient,
+    db: AsyncSession,
+    service: dict[str, Any],
+    pro: Member,
+    monday_10: datetime,
+) -> None:
+    _, token = await book(
+        client, service["id"], monday_10, professional_id=pro.professional_id
+    )
+    target = monday_10 + timedelta(hours=3)
+
+    rescheduled, booked = await asyncio.gather(
+        reschedule_link(client, token, target, professional_id=pro.professional_id),
+        post_booking(
+            client,
+            booking_body(
+                service["id"],
+                target,
+                professional_id=pro.professional_id,
+                email="segunda@example.com",
+            ),
+        ),
+    )
+
+    assert sorted([rescheduled.status_code, booked.status_code]) in (
+        [200, 409],
+        [201, 409],
+    )
+    assert await count_appointments(db) == 1 + (booked.status_code == 201)
+
+
+async def test_two_simultaneous_cancellations_of_the_same_link(
+    client: AsyncClient,
+    db: AsyncSession,
+    service: dict[str, Any],
+    pro: Member,
+    monday_10: datetime,
+) -> None:
+    """The lock serializes them, so only one cancels and sends the e-mail."""
+    _, token = await book(client, service["id"], monday_10)
+
+    responses = await asyncio.gather(
+        cancel_link(client, token), cancel_link(client, token)
+    )
+
+    assert sorted(item.status_code for item in responses) == [200, 409]
+    refused = next(item for item in responses if item.status_code == 409)
+    assert refused.json()["code"] == "INVALID_STATUS_TRANSITION"
+    assert await count_emails(db, "appointment_cancellation") == 1
+
+
+async def test_cancel_and_reschedule_of_the_same_link_at_the_same_time(
+    client: AsyncClient,
+    db: AsyncSession,
+    service: dict[str, Any],
+    pro: Member,
+    monday_10: datetime,
+) -> None:
+    """Whatever the order, no deadlock, and the appointment ends cancelled."""
+    booked, token = await book(
+        client, service["id"], monday_10, professional_id=pro.professional_id
+    )
+
+    cancelled, rescheduled = await asyncio.gather(
+        cancel_link(client, token),
+        reschedule_link(
+            client,
+            token,
+            monday_10 + timedelta(hours=3),
+            professional_id=pro.professional_id,
+        ),
+    )
+
+    assert cancelled.status_code == 200
+    assert rescheduled.status_code in (200, 409)
+    appointment = await get_appointment(db, booked.json()["id"])
+    assert appointment.status.value == "cancelled"

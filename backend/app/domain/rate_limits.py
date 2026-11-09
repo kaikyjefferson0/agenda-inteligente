@@ -24,6 +24,9 @@ PUBLIC_AVAILABILITY_BY_IP = RateLimit(
     "public_availability_ip", 120, timedelta(minutes=1)
 )
 PUBLIC_BOOKING_BY_IP = RateLimit("public_booking_ip", 10, timedelta(hours=1))
+PUBLIC_CUSTOMER_LINK_BY_IP = RateLimit(
+    "public_customer_link_ip", 60, timedelta(minutes=1)
+)
 
 
 def window_start(now: datetime, window: timedelta) -> datetime:

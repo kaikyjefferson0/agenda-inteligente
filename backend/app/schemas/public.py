@@ -111,3 +111,47 @@ class BookingResponse(BaseModel):
         description="Nulo em uma repetição: o token só existe em forma de hash"
     )
     email_status: Literal["queued", "skipped", "unchanged"]
+
+
+class RescheduleRequest(RequestModel):
+    starts_at: BookingInstant
+    professional_id: UUID | None = None
+
+
+class LinkBusinessData(BaseModel):
+    name: str
+    slug: str
+    timezone: str
+
+
+class LinkServiceData(BaseModel):
+    id: UUID
+    name: str
+    duration_minutes: int = Field(description="Copiada do agendamento (RN11)")
+    price_cents: int = Field(description="Copiado do agendamento (RN11)")
+
+
+class LinkProfessionalData(BaseModel):
+    id: UUID
+    name: str
+
+
+class CustomerAppointmentResponse(BaseModel):
+    """Sem nenhum dado do cliente: nem nome, nem e-mail, nem telefone."""
+
+    id: UUID
+    status: AppointmentStatus
+    starts_at: datetime
+    ends_at: datetime
+    business: LinkBusinessData
+    service: LinkServiceData
+    professional: LinkProfessionalData
+    can_cancel: bool
+    can_reschedule: bool
+    change_deadline_at: datetime = Field(
+        description="Início atual menos o prazo de alteração do negócio (RN17)"
+    )
+
+
+class CustomerChangeResponse(CustomerAppointmentResponse):
+    email_status: Literal["queued", "skipped"]

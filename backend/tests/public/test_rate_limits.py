@@ -7,13 +7,18 @@ from pytest import mark
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
+from app.core.security import generate_opaque_token
 from tests.auth.helpers import Clock
 from tests.configuration.helpers import Member
 from tests.public.helpers import (
+    book,
     booking_body,
+    cancel_link,
     count_appointments,
     count_emails,
     get_availability,
+    get_link,
+    link_path,
     local_day,
     page_path,
     post_booking,
@@ -202,3 +207,65 @@ async def test_each_public_route_has_its_own_counter(
     assert_limited(await client.get(page_path()))
     response = await get_availability(client, service["id"], local_day(monday_10))
     assert response.status_code == 200
+
+
+LINK_REQUESTS_PER_MINUTE = 60
+
+
+async def test_link_routes_share_one_counter_that_counts_invalid_requests(
+    client: AsyncClient,
+    db: AsyncSession,
+    service: dict[str, Any],
+    pro: Member,
+    monday_10: datetime,
+) -> None:
+    """D22: the three routes, invalid tokens and invalid bodies, in one counter."""
+    _, token = await book(client, service["id"], monday_10)
+    for index in range(LINK_REQUESTS_PER_MINUTE):
+        kind = index % 3
+        if kind == 0:
+            response = await get_link(client, generate_opaque_token())
+            assert response.status_code == 404
+        elif kind == 1:
+            response = await client.post(f"{link_path(token)}/reschedule", json={})
+            assert response.status_code == 422
+        else:
+            response = await get_link(client, token)
+            assert response.status_code == 200
+
+    response = await cancel_link(client, token)
+
+    assert_limited(response)
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+    assert await count_emails(db, "appointment_cancellation") == 0
+
+
+async def test_link_limit_starts_again_in_the_next_minute(
+    client: AsyncClient,
+    clock: Clock,
+    service: dict[str, Any],
+    pro: Member,
+    monday_10: datetime,
+) -> None:
+    _, token = await book(client, service["id"], monday_10)
+    for _ in range(LINK_REQUESTS_PER_MINUTE):
+        await get_link(client, token)
+    assert_limited(await get_link(client, token))
+
+    clock.advance(timedelta(minutes=1))
+
+    assert (await get_link(client, token)).status_code == 200
+
+
+async def test_link_counter_is_apart_from_the_business_page(
+    client: AsyncClient,
+    service: dict[str, Any],
+    pro: Member,
+    monday_10: datetime,
+) -> None:
+    _, token = await book(client, service["id"], monday_10)
+    for _ in range(LINK_REQUESTS_PER_MINUTE + 1):
+        await get_link(client, token)
+
+    assert (await client.get(page_path())).status_code == 200

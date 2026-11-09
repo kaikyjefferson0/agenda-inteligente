@@ -20,6 +20,7 @@ from tests.public.helpers import (
     count_appointments,
     count_emails,
     get_appointment,
+    get_link,
     link_token,
     page_path,
     post_booking,
@@ -343,11 +344,10 @@ async def test_ct36_repeat_after_the_email_limit_replaces_the_link(
     new_token = link_token(repeated)
     old_token = link_token(created)
     assert new_token != old_token
-    # The route of the link belongs to the next part. Here, the stored hash proves
-    # that only the new token can be found.
     appointment = await get_appointment(db, created.json()["id"])
     assert appointment.access_token_hash == hash_opaque_token(new_token)
-    assert appointment.access_token_hash != hash_opaque_token(old_token)
+    assert (await get_link(client, old_token)).status_code == 404
+    assert (await get_link(client, new_token)).status_code == 200
     assert await count_appointments(db) == 1
     assert await count_emails(db) == 0
 
@@ -371,6 +371,8 @@ async def test_ct36_each_repeat_replaces_the_link_again_even_with_quota_back(
 
     assert first.json()["email_status"] == "skipped"
     assert link_token(first) != link_token(second)
+    for replaced in (link_token(created), link_token(first)):
+        assert (await get_link(client, replaced)).status_code == 404
     appointment = await get_appointment(db, created.json()["id"])
     assert appointment.access_token_hash == hash_opaque_token(link_token(second))
     assert await count_emails(db) == 0

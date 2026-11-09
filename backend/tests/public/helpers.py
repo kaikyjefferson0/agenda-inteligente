@@ -98,11 +98,65 @@ async def count_appointments(db: AsyncSession) -> int | None:
     return await db.scalar(select(func.count()).select_from(Appointment))
 
 
-async def count_emails(db: AsyncSession) -> int | None:
+async def count_emails(
+    db: AsyncSession, template: str = "appointment_confirmation"
+) -> int | None:
     return await db.scalar(
         select(func.count())
         .select_from(EmailOutbox)
-        .where(EmailOutbox.template == "appointment_confirmation")
+        .where(EmailOutbox.template == template)
+    )
+
+
+async def emails_with(db: AsyncSession, template: str) -> list[EmailOutbox]:
+    rows = await db.scalars(
+        select(EmailOutbox)
+        .where(EmailOutbox.template == template)
+        .order_by(EmailOutbox.created_at)
+        .execution_options(populate_existing=True)
+    )
+    return list(rows)
+
+
+def link_path(token: str) -> str:
+    return f"{API}/public/appointments/{token}"
+
+
+async def book(
+    client: AsyncClient,
+    service_id: str,
+    starts_at: datetime,
+    **body: Any,
+) -> tuple[Response, str]:
+    """Books through the public route and returns the response and the raw token."""
+    response = await post_booking(client, booking_body(service_id, starts_at, **body))
+    assert response.status_code == 201, response.text
+    return response, link_token(response)
+
+
+async def get_link(client: AsyncClient, token: str) -> Response:
+    return await client.get(link_path(token))
+
+
+async def cancel_link(client: AsyncClient, token: str) -> Response:
+    return await client.post(f"{link_path(token)}/cancel")
+
+
+async def reschedule_link(
+    client: AsyncClient,
+    token: str,
+    starts_at: datetime | str,
+    *,
+    professional_id: str | None = None,
+) -> Response:
+    return await client.post(
+        f"{link_path(token)}/reschedule",
+        json={
+            "starts_at": starts_at
+            if isinstance(starts_at, str)
+            else local_iso(starts_at),
+            "professional_id": professional_id,
+        },
     )
 
 
