@@ -1,0 +1,33 @@
+import { Link, Outlet } from 'react-router'
+
+import { Button } from '@/components/ui/button'
+
+import { Brand } from './Brand'
+import { SkipLink } from './SkipLink'
+
+/** Public pages and account pages: mobile first, from 360 px (D55). */
+export function PublicLayout() {
+  return (
+    <div className="flex min-h-svh flex-col">
+      <SkipLink />
+      <header className="border-b">
+        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4">
+          <Brand />
+          <nav aria-label="Principal">
+            <Button asChild variant="ghost">
+              <Link to="/entrar">Entrar</Link>
+            </Button>
+          </nav>
+        </div>
+      </header>
+      <main id="conteudo" className="flex flex-1 flex-col">
+        <Outlet />
+      </main>
+      <footer className="border-t">
+        <div className="mx-auto w-full max-w-5xl px-4 py-6 text-sm text-muted-foreground">
+          Agenda Inteligente · projeto de portfólio full stack.
+        </div>
+      </footer>
+    </div>
+  )
+}
