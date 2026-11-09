@@ -2,7 +2,17 @@
 
 Sistema de agendamento online para negócios de beleza e bem-estar. Projeto de portfólio full stack, com a documentação em [`docs/`](docs/README.md).
 
-**Estado atual:** Fase 4, com a autenticação e a configuração no backend. A autenticação cobre cadastro do negócio e do Dono, login, logout, renovação de sessão, convite de profissional e recuperação de senha. A configuração cobre as definições do negócio, os serviços, a equipe (Dono como profissional, desativação e listagem), os serviços de cada profissional, o expediente semanal e os bloqueios. Os e-mails apenas entram na `email_outbox`, porque o worker ainda não existe. O agendamento, a disponibilidade, a página pública e o frontend de autenticação virão nas fases seguintes. O projeto tem CI no GitHub Actions, que roda em todo pull request para a `main`.
+**Estado atual:** o backend está completo. Ele cobre:
+
+- **Autenticação:** cadastro do negócio e do Dono, login, logout, renovação de sessão, convite de profissional e recuperação de senha.
+- **Configuração:** definições do negócio, serviços, equipe, serviços de cada profissional, expediente semanal e bloqueios.
+- **Agendamento público:** página do negócio, disponibilidade e reserva, com idempotência e limites por IP.
+- **Link do cliente:** consulta, cancelamento e remarcação.
+- **Agenda da equipe:** agenda, agendamento manual, remarcação, cancelamento e resultado do atendimento.
+- **Envio de e-mails:** worker com retentativas, Mailpit no desenvolvimento e Resend em produção.
+- **Restauração da demo:** tarefa que recria o negócio de demonstração com datas atuais.
+
+O frontend é a próxima etapa. O projeto tem CI no GitHub Actions, que roda em todo pull request para a `main`.
 
 ## Pré-requisitos
 
@@ -52,6 +62,23 @@ Para conferir a revisão aplicada e se os modelos estão sincronizados com as mi
 docker compose exec api alembic current
 docker compose exec api alembic check
 ```
+
+## Demo
+
+Com as migrações aplicadas, crie ou restaure o negócio de demonstração:
+
+```bash
+docker compose run --rm api python -m app.jobs.restore_demo
+```
+
+A tarefa apaga e recria apenas o negócio demo, com agendamentos nos 7 dias anteriores e nos próximos, e pode ser repetida. Ela exige `DEMO_PASSWORD` no `.env`, de 12 a 128 caracteres; se o seu `.env` for anterior à demo, copie a linha do `.env.example`. Ao terminar, a página pública fica em <http://localhost:8000/api/v1/public/businesses/barbearia-demo>, e as duas contas entram com essa senha:
+
+| Conta | Perfil |
+|---|---|
+| `dono@demo.example.com` | Dono, que também atende |
+| `profissional@demo.example.com` | Profissional |
+
+Cada restauração encerra as sessões abertas nessas contas.
 
 ## Testes
 
