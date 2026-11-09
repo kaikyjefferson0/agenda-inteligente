@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     smtp_port: int = Field(default=1025, ge=1, le=65535)
     # SecretStr keeps the key out of reprs and validation errors.
     resend_api_key: SecretStr | None = None
+    # D44 and D46: the password of both demo accounts. Optional for the API;
+    # the restoration job refuses to run without a valid one (RN30).
+    demo_password: SecretStr | None = None
 
     @model_validator(mode="after")
     def _require_resend_key(self) -> Self:

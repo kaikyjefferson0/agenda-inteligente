@@ -104,7 +104,7 @@ O merge é bloqueado abaixo de:
 |---|---|---|---|
 | CT26 | Cadastro com `REGISTRATION_ENABLED=false` | `403`, sem criar dados | Integração |
 | CT27 | Limite por destinatário ou teto diário atingido | Agendamento é mantido, nada é enfileirado, e o link é devolvido | Integração |
-| CT29 | Restauração da demo | Dados demo recriados com datas atuais; outros negócios intactos | Integração |
+| CT29 | Restauração da demo, com outro negócio que tem agendamentos, usuários, sessões e e-mails pendentes | Negócio, contas, serviços, expediente, bloqueio e agendamentos recriados com datas relativas ao dia atual: nos 7 dias anteriores, `completed`, `no_show` e `cancelled`; de hoje em diante, `confirmed`. As linhas do outro negócio e a fila ficam idênticas (D42, D43) | Unidade e integração |
 | CT30 | Worker com falha temporária ou dois workers simultâneos | Reenvia com espera crescente; dois workers não pegam a mesma mensagem | Integração |
 | CT32 | Negócio demo tenta alterar campos travados, criar serviço, convidar ou recuperar senha | Alterações e convite recusados com `DEMO_RESTRICTED`; recuperação responde `202`; nenhum e-mail é enfileirado | Integração |
 | CT57 | Os 5 templates de e-mail, inclusive com nomes contendo `<script>` | Assunto, texto e HTML sem o nome do cliente, com o horário no fuso do negócio e os nomes escapados no HTML (D37) | Unidade |
@@ -113,6 +113,11 @@ O merge é bloqueado abaixo de:
 | CT60 | Mensagem reservada por um worker que caiu | Volta a ser enviada depois que a reserva vence (D38) | Integração |
 | CT61 | Mensagem pendente há mais de 24 horas | `failed` com `"expired"`, sem chamar o provedor (D39) | Integração |
 | CT62 | Logs do worker e `last_error` | Não contêm o destinatário, o link nem o token (D40) | Integração |
+| CT63 | Restauração duas vezes seguidas | Mesmo resultado, com os mesmos IDs (D42, D45) | Integração |
+| CT64 | `barbearia-demo` pertencendo a um negócio real, e-mail da demo em uso por outro negócio, dois negócios demo ou `DEMO_PASSWORD` ausente ou inválida | A tarefa falha, e nada é apagado nem criado (D46) | Integração |
+| CT65 | Uso da demo depois da restauração | O Dono e o Profissional entram com `DEMO_PASSWORD`; as sessões anteriores deixam de funcionar; a disponibilidade pública do próximo dia com expediente (amanhã, de segunda a sexta) tem horários livres em todos os serviços; a agenda tem agendamentos no passado e no futuro (D43, D44, D47) | Integração |
+| CT66 | Duas restaurações simultâneas | Terminam sem erro, com um único conjunto de dados (D45) | Integração |
+| CT67 | Mensagens pendentes para a demo e para outros negócios | As da demo viram `failed`, com `"demo_restored"` e `payload` nulo; as de outros negócios ficam intactas (D47) | Integração |
 
 ## Ponta a ponta
 
@@ -147,4 +152,4 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC16 | CT15, CT16, CT35, CT52, CT54, CT55, CT57 |
 | UC17 | CT33, CT34, CT35, CT53, CT55, CT56, CT57 |
 | UC18 | CT34, CT55 |
-| Transversal | CT19, CT20, CT29, CT58, CT59, CT60, CT61, CT62 |
+| Transversal | CT19, CT20, CT29, CT58, CT59, CT60, CT61, CT62, CT63, CT64, CT65, CT66, CT67 |

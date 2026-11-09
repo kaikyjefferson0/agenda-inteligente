@@ -18,7 +18,7 @@ flowchart LR
 | API | Autenticação, regras de negócio e persistência |
 | PostgreSQL | Dados, garantias de integridade, fila de e-mails e contadores de limite |
 | Worker | Envia os e-mails pendentes, com retentativas |
-| Restauração da demo | Tarefa agendada que recria os dados do negócio demo, apagando os dependentes antes, porque as chaves estrangeiras usam `ON DELETE RESTRICT` |
+| Restauração da demo | Tarefa agendada que recria os dados do negócio demo em uma única transação, apagando os dependentes antes, porque as chaves estrangeiras usam `ON DELETE RESTRICT` |
 
 ## Estrutura do repositório
 
@@ -112,6 +112,20 @@ O padrão outbox grava o e-mail na mesma transação da operação, então nenhu
 - **Logs (D40):** o worker registra apenas `id`, template, status e número da tentativa. `last_error` guarda só o tipo do erro e o código HTTP, como `"HTTPStatusError 503"`, com no máximo 200 caracteres; nunca o destinatário, o link, o `payload` nem o corpo da resposta do provedor.
 - **Adaptadores (D34):** o worker só conhece a interface `EmailSender`. `EMAIL_BACKEND` escolhe entre `smtp` (Mailpit no desenvolvimento), `fake` (mensagens em memória, nos testes) e `resend` (produção). Os textos vêm de funções puras em `app/email/`, em português, com os nomes digitados pelo Dono escapados no HTML (D37).
 
+### Restauração da demo
+
+A tarefa `python -m app.jobs.restore_demo` (RN29) recria o negócio demo. A função `restore_demo(session, settings, now)` faz todo o trabalho e pode ser testada; o `main()` só abre a sessão e termina com código 0, ou 1 quando a restauração é recusada. Ela cria a demo se ela não existir, e rodá-la de novo no mesmo dia produz os mesmos dados.
+
+- **Senha (D46):** sem `DEMO_PASSWORD` de 12 a 128 caracteres (RN30), a tarefa termina antes de acessar o banco. Os dois hashes Argon2 são calculados antes da transação, para mantê-la curta.
+- **Trava (D45):** a transação começa com `pg_advisory_xact_lock` sobre uma chave fixa. Uma segunda execução simultânea espera e, ao continuar, encontra os dados da primeira.
+- **Verificação (D46):** antes de qualquer escrita, a tarefa recusa mais de um negócio com `is_demo = true`, o `slug` `barbearia-demo` em um negócio que não é a demo e um e-mail das contas da demo em um usuário de outro negócio. Recusada, ela desfaz a transação sem ter apagado nada.
+- **Fila (D47):** mensagens `pending` para `@demo.example.com` ou para os e-mails `@example.com` dos clientes da demo viram `failed`, com `last_error = "demo_restored"` e `payload` nulo, porque os links deixariam de funcionar. A fila não tem `business_id`, então a escolha é pelo destinatário.
+- **Exclusão (D42):** como as chaves estrangeiras usam `ON DELETE RESTRICT`, os dados do negócio demo são apagados dos dependentes para o negócio: agendamentos, bloqueios, expediente, serviços dos profissionais, profissionais, serviços, tokens de conta, tokens de refresh, usuários e o negócio. Sem os tokens, as sessões anteriores deixam de valer, e quem estava logado entra de novo.
+- **Criação (D42 a D44):** negócio, contas, profissionais e serviços voltam com UUIDs fixos, definidos em `app/services/demo_content.py`. Expediente, bloqueio e agendamentos recebem UUIDs derivados de uma chave estável para o mesmo dia. Os horários vêm de `app/domain/demo_schedule.py`, uma função pura que parte da data de hoje no fuso do negócio, sem `random`.
+- **Logs (D49):** apenas as quantidades apagadas e criadas por tabela, as mensagens retiradas da fila e a duração; nunca nomes, e-mails ou senhas.
+
+Tudo acontece em uma única transação: uma falha no meio deixa a demo anterior intacta.
+
 ## Segurança
 
 ### Autenticação
@@ -164,7 +178,7 @@ A demo guarda apenas nome, e-mail e telefone do agendamento, e a restauração n
 
 ## Ambiente local
 
-O `docker-compose.yml` sobe `db`, `api`, `worker`, `mailpit` e `frontend`. O `worker` usa o mesmo build e as mesmas variáveis da `api` e roda `python -m app.jobs.email_worker`; ele para de forma limpa com `SIGTERM` e `SIGINT`. Em desenvolvimento, o e-mail vai por SMTP ao Mailpit, um servidor de e-mail falso cuja interface web, em `http://localhost:8025`, mostra as mensagens enviadas. As portas do Mailpit (8025 e 1025) ficam publicadas só em `127.0.0.1`. Nada é gravado no log, porque as mensagens levam links com token e o e-mail do cliente (D35). Os segredos ficam em variáveis de ambiente, e o repositório inclui somente um `.env.example`.
+O `docker-compose.yml` sobe `db`, `api`, `worker`, `mailpit` e `frontend`. O `worker` usa o mesmo build e as mesmas variáveis da `api` e roda `python -m app.jobs.email_worker`; ele para de forma limpa com `SIGTERM` e `SIGINT`. Em desenvolvimento, o e-mail vai por SMTP ao Mailpit, um servidor de e-mail falso cuja interface web, em `http://localhost:8025`, mostra as mensagens enviadas. As portas do Mailpit (8025 e 1025) ficam publicadas só em `127.0.0.1`. Nada é gravado no log, porque as mensagens levam links com token e o e-mail do cliente (D35). A restauração da demo não tem serviço próprio: roda sob demanda, com `docker compose run --rm api python -m app.jobs.restore_demo`. Os segredos ficam em variáveis de ambiente, e o repositório inclui somente um `.env.example`.
 
 Variáveis principais:
 
@@ -182,6 +196,7 @@ Variáveis principais:
 | `CORS_ALLOWED_ORIGINS` | Origens permitidas, separadas por vírgula |
 | `FRONTEND_BASE_URL` | Base dos links enviados por e-mail |
 | `TRUSTED_CLIENT_IP_HEADER` | Cabeçalho com o IP do cliente, definido pelo proxy da hospedagem; vazio sem proxy |
+| `DEMO_PASSWORD` | Senha das contas da demo, de 12 a 128 caracteres; opcional para a API e obrigatória para a restauração da demo |
 
 ## CI (GitHub Actions)
 
@@ -201,7 +216,7 @@ Os itens 1, 2, 3 e 6, além do ESLint e do `tsc` do item 4, já rodam em `.githu
 - **API, worker e banco:** PaaS, como Render ou Railway.
 - **Frontend:** hospedagem estática, como Cloudflare Pages ou Vercel.
 - **Migrações:** executadas uma vez antes de cada nova versão da API.
-- **Restauração da demo:** tarefa agendada da plataforma, que executa `app/jobs`.
+- **Restauração da demo:** tarefa agendada da plataforma, todos os dias às 03:00 de `America/Sao_Paulo`, com o mesmo build e as mesmas variáveis da API, `DEMO_PASSWORD` incluída, executando `python -m app.jobs.restore_demo` (D45). Um código de saída diferente de 0 indica restauração recusada.
 
 A escolha final e os preços serão confirmados antes do deploy, porque os planos gratuitos mudam e podem hibernar serviços ou não oferecer tarefas agendadas.
 
