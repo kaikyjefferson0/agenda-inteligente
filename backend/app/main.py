@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.appointments import router as appointments_router
 from app.api.auth import router as auth_router
 from app.api.business import router as business_router
 from app.api.catalog import router as catalog_router
@@ -44,5 +45,6 @@ app.include_router(business_router, prefix=API_PREFIX)
 app.include_router(catalog_router, prefix=API_PREFIX)
 app.include_router(professionals_router, prefix=API_PREFIX)
 app.include_router(time_blocks_router, prefix=API_PREFIX)
+app.include_router(appointments_router, prefix=API_PREFIX)
 app.include_router(public_router, prefix=API_PREFIX)
 app.include_router(customer_link_router, prefix=API_PREFIX)

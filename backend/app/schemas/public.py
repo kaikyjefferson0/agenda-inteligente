@@ -1,4 +1,3 @@
-import unicodedata
 from datetime import UTC, datetime
 from datetime import date as LocalDate
 from typing import Annotated, Literal
@@ -10,25 +9,15 @@ from pydantic import (
     BaseModel,
     EmailStr,
     Field,
-    StringConstraints,
 )
 
 from app.models import AppointmentStatus
-from app.schemas.common import Name, RequestModel
+from app.schemas.common import CustomerName, CustomerPhone, RequestModel
 
 # The format of the example in the API document. Any version of UUID is accepted.
 IDEMPOTENCY_KEY_PATTERN = (
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 )
-# E.164, as in the example of the API document. The frontend converts what is typed.
-PHONE_PATTERN = r"^\+[1-9][0-9]{7,14}$"
-CONTROL_CHARACTER_CATEGORY = "Cc"
-
-
-def _reject_control_characters(value: str) -> str:
-    if any(unicodedata.category(char) == CONTROL_CHARACTER_CATEGORY for char in value):
-        raise ValueError("must not contain control characters")
-    return value
 
 
 def _ensure_convertible(value: datetime) -> datetime:
@@ -40,8 +29,6 @@ def _ensure_convertible(value: datetime) -> datetime:
     return value
 
 
-CustomerName = Annotated[Name, AfterValidator(_reject_control_characters)]
-CustomerPhone = Annotated[str, StringConstraints(pattern=PHONE_PATTERN)]
 BookingInstant = Annotated[AwareDatetime, AfterValidator(_ensure_convertible)]
 
 

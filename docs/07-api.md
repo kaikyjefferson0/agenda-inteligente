@@ -141,6 +141,105 @@ Nas rotas de administração, os instantes são devolvidos em UTC, e o frontend 
 | `POST /appointments/{id}/complete` | Marca como concluído | Dono ou o próprio | `200` | UC18 |
 | `POST /appointments/{id}/no-show` | Marca como não compareceu | Dono ou o próprio | `200` | UC18 |
 
+Essas rotas não têm limite por IP, como as demais rotas de administração. As cotas de e-mail (RN26) continuam valendo (D33).
+
+### Exemplo: agenda
+
+```http
+GET /api/v1/appointments?from=2026-11-10T03:00:00Z&to=2026-11-11T03:00:00Z
+```
+
+```json
+[
+  {
+    "id": "a1b2c3d4-0000-4000-8000-000000000001",
+    "professional_id": "5d0c7e42-0000-4000-8000-000000000002",
+    "service_id": "2c9e7d1a-6b1f-4f7e-9a51-3d8f1b7e4c20",
+    "service_name": "Corte",
+    "starts_at": "2026-11-10T12:00:00Z",
+    "ends_at": "2026-11-10T12:30:00Z",
+    "blocked_until": "2026-11-10T12:40:00Z",
+    "duration_minutes": 30,
+    "preparation_minutes": 10,
+    "price_cents": 5000,
+    "status": "confirmed",
+    "origin": "public",
+    "customer_name": "Cliente de Exemplo",
+    "customer_email": "cliente@example.com",
+    "customer_phone": "+5511999999999",
+    "cancelled_at": null
+  }
+]
+```
+
+- `from` e `to` são obrigatórios, em ISO 8601 com fuso, e formam o intervalo semiaberto `[from, to)`, de no máximo 31 × 24 horas. Entra o agendamento com `starts_at` no período (D25).
+- A lista traz todos os status, inclusive cancelados, ordenados por `starts_at` e `id`, sem paginação.
+- Sem `professional_id`, o Dono vê todas as agendas, e o Profissional, a própria.
+- `service_name` é o nome atual do serviço; duração, preparo e preço são os copiados no agendamento (RN11). A resposta nunca traz o hash do token nem os campos de idempotência (D26).
+
+### Exemplo: criação manual
+
+```http
+POST /api/v1/appointments
+Content-Type: application/json
+
+{
+  "professional_id": "5d0c7e42-0000-4000-8000-000000000002",
+  "service_id": "2c9e7d1a-6b1f-4f7e-9a51-3d8f1b7e4c20",
+  "starts_at": "2026-11-10T12:07:00Z",
+  "customer": {
+    "name": "Cliente de Exemplo",
+    "email": "cliente@example.com",
+    "phone": "+5511999999999"
+  }
+}
+```
+
+```json
+{
+  "id": "a1b2c3d4-0000-4000-8000-000000000003",
+  "professional_id": "5d0c7e42-0000-4000-8000-000000000002",
+  "service_id": "2c9e7d1a-6b1f-4f7e-9a51-3d8f1b7e4c20",
+  "service_name": "Corte",
+  "starts_at": "2026-11-10T12:07:00Z",
+  "ends_at": "2026-11-10T12:37:00Z",
+  "blocked_until": "2026-11-10T12:47:00Z",
+  "duration_minutes": 30,
+  "preparation_minutes": 10,
+  "price_cents": 5000,
+  "status": "confirmed",
+  "origin": "staff",
+  "customer_name": "Cliente de Exemplo",
+  "customer_email": "cliente@example.com",
+  "customer_phone": "+5511999999999",
+  "cancelled_at": null,
+  "access_url": "https://app.exemplo.com/agendamento/<token>",
+  "email_status": "queued"
+}
+```
+
+- Só `customer.name` é obrigatório, com as regras da página pública; `email` e `phone` são opcionais e, quando enviados, seguem as mesmas validações (D9).
+- `starts_at` pode ser qualquer minuto exato, sem grade nem antecedência (RN19), mas não pode ter segundos nem frações de segundo.
+- Não há `Idempotency-Key`. A exclusion constraint impede que uma repetição crie outro agendamento no mesmo horário (RN14).
+- Com e-mail, o cliente recebe o link, como na reserva pública (D10). Sem e-mail, não há link (D29).
+- A remarcação recebe `starts_at` (obrigatório) e `professional_id` (opcional; ausente ou `null` mantém o atual, sem a RN10). Ela troca o horário na mesma linha, mantém serviço, valores copiados e o link do cliente, e pode sobrepor o próprio horário atual (D30).
+- O cancelamento, a conclusão e o não comparecimento não têm corpo. A remarcação e o cancelamento respondem com o item da agenda mais `email_status`; a conclusão e o não comparecimento, só com o item da agenda (D31, D32).
+
+`email_status`:
+
+- **`queued`:** o e-mail foi enfileirado. Na criação, é o de confirmação, com o link; no cancelamento e na remarcação, os da D23. O de remarcação feito pela equipe não leva o link, porque só o hash é guardado, e informa que o link já recebido continua válido (D31).
+- **`skipped`:** um limite de envio foi atingido. A operação vale do mesmo jeito, e nada é enfileirado (RN26). Na criação, o link vem só na resposta, e o agendamento fica com `link_email_skipped = true` (D29).
+- **`none`:** o agendamento não tem e-mail, então não há a quem avisar e nenhuma cota é gasta. Na criação, `access_url` vem `null`.
+
+Recusas. Antes delas, um corpo ou parâmetro com formato inválido ou campo desconhecido responde `422`:
+
+- **Período (D25):** `to <= from` ou intervalo acima de 31 × 24 horas responde `422`.
+- **Permissão (D27):** Profissional que pede a agenda de colega, ou cria, altera ou marca resultado em agendamento de colega, recebe `403 FORBIDDEN`. Agendamento, profissional ou serviço de outro negócio responde `404`, igual a inexistente.
+- **Dados da criação e da remarcação (D28, D30):** serviço inativo, profissional que não atende o serviço ou com `is_bookable = false` e `starts_at` com segundos respondem `422`. Na remarcação pela equipe, o serviço inativo também responde `422`, como na criação manual; no link do cliente, o mesmo caso responde `409` (D21), porque o cliente não precisa saber o motivo.
+- **Horário (D28, D30):** no passado, fora do expediente (o bloco inteiro em um intervalo, RN03), sobre agendamento não cancelado ou sobre bloqueio responde `409 SLOT_UNAVAILABLE`. Na remarcação, o agendamento original fica intacto.
+- **Status (D30, D31):** remarcar ou cancelar fora de `confirmed`, inclusive cancelar duas vezes, responde `409 INVALID_STATUS_TRANSITION`. Não há prazo: a equipe cancela inclusive depois do início (RN20).
+- **Resultado (D32):** concluir ou marcar não comparecimento fora de `confirmed` ou antes de `starts_at` responde `409 INVALID_STATUS_TRANSITION`. No instante exato do início, é aceito.
+
 ## Público
 
 | Rota | Função | Sucesso | UC |

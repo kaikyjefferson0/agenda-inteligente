@@ -179,7 +179,7 @@ async def _describe(
     )
 
 
-async def _notify(
+async def notify_customer(
     session: AsyncSession,
     settings: Settings,
     appointment: Appointment,
@@ -228,7 +228,7 @@ async def cancel_by_token(
     appointment.cancelled_at = now
     service = await _service_of(session, business, appointment)
     described = await _describe(session, business, appointment, service, now)
-    email_status = await _notify(
+    email_status = await notify_customer(
         session,
         settings,
         appointment,
@@ -332,7 +332,7 @@ async def reschedule_by_token(
         raise
 
     described = await _describe(session, business, appointment, service, now)
-    email_status = await _notify(
+    email_status = await notify_customer(
         session,
         settings,
         appointment,

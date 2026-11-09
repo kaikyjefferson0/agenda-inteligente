@@ -33,6 +33,15 @@ class BusyPeriod:
     ends_at: datetime
 
 
+def overlaps_any(
+    starts_at: datetime, ends_at: datetime, busy: Iterable[BusyPeriod]
+) -> bool:
+    """RN04: half-open periods, so a block may start exactly when another ends."""
+    return any(
+        period.starts_at < ends_at and starts_at < period.ends_at for period in busy
+    )
+
+
 def is_within_advance(instant: datetime, rules: BookingRules, now: datetime) -> bool:
     """RN05: both limits are inclusive."""
     return rules.earliest(now) <= instant <= rules.latest(now)
@@ -111,10 +120,7 @@ def available_slots(
             starts_at, blocked_until, working_hours, rules.timezone
         ):
             continue
-        if any(
-            period.starts_at < blocked_until and starts_at < period.ends_at
-            for period in occupied
-        ):
+        if overlaps_any(starts_at, blocked_until, occupied):
             continue
         slots.append(starts_at)
     return slots

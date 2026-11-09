@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.availability import BusyPeriod
 from app.domain.schedule import AppointmentSummary
-from app.models import Appointment, AppointmentStatus
+from app.models import Appointment, AppointmentStatus, Service
 
 
 async def _summaries(
@@ -74,21 +74,28 @@ async def busy_periods(
     professional_ids: Sequence[UUID],
     starts_at: datetime,
     ends_at: datetime,
+    *,
+    excluding: UUID | None = None,
 ) -> dict[UUID, list[BusyPeriod]]:
-    """RN04: every status but cancelled occupies [starts_at, blocked_until)."""
-    rows = await session.execute(
-        select(
-            Appointment.professional_id,
-            Appointment.starts_at,
-            Appointment.blocked_until,
-        ).where(
-            Appointment.business_id == business_id,
-            Appointment.professional_id.in_(professional_ids),
-            Appointment.status != AppointmentStatus.CANCELLED,
-            Appointment.starts_at < ends_at,
-            Appointment.blocked_until > starts_at,
-        )
+    """RN04: every status but cancelled occupies [starts_at, blocked_until).
+
+    A reschedule by the team leaves its own appointment out (D30), because the
+    row is updated in place and may overlap its current time.
+    """
+    query = select(
+        Appointment.professional_id,
+        Appointment.starts_at,
+        Appointment.blocked_until,
+    ).where(
+        Appointment.business_id == business_id,
+        Appointment.professional_id.in_(professional_ids),
+        Appointment.status != AppointmentStatus.CANCELLED,
+        Appointment.starts_at < ends_at,
+        Appointment.blocked_until > starts_at,
     )
+    if excluding is not None:
+        query = query.where(Appointment.id != excluding)
+    rows = await session.execute(query)
     periods: dict[UUID, list[BusyPeriod]] = defaultdict(list)
     for professional_id, period_start, period_end in rows:
         periods[professional_id].append(BusyPeriod(period_start, period_end))
@@ -131,6 +138,46 @@ async def get_by_idempotency_key(
             Appointment.idempotency_key == idempotency_key,
         )
         .execution_options(populate_existing=True)
+    )
+
+
+async def list_in_period(
+    session: AsyncSession,
+    business_id: UUID,
+    starts_at: datetime,
+    ends_at: datetime,
+    *,
+    professional_id: UUID | None = None,
+) -> list[tuple[Appointment, str]]:
+    """D25: every status, starting in [starts_at, ends_at), with the service name."""
+    query = (
+        select(Appointment, Service.name)
+        .join(
+            Service,
+            (Service.business_id == Appointment.business_id)
+            & (Service.id == Appointment.service_id),
+        )
+        .where(
+            Appointment.business_id == business_id,
+            Appointment.starts_at >= starts_at,
+            Appointment.starts_at < ends_at,
+        )
+        .order_by(Appointment.starts_at, Appointment.id)
+    )
+    if professional_id is not None:
+        query = query.where(Appointment.professional_id == professional_id)
+    rows = await session.execute(query)
+    return [(row[0], row[1]) for row in rows]
+
+
+async def get(
+    session: AsyncSession, business_id: UUID, appointment_id: UUID
+) -> Appointment | None:
+    return await session.scalar(
+        select(Appointment).where(
+            Appointment.business_id == business_id,
+            Appointment.id == appointment_id,
+        )
     )
 
 
