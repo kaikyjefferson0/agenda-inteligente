@@ -53,6 +53,16 @@ PROBLEMS: dict[ErrorCode, Problem] = {
     ErrorCode.SLOT_UNAVAILABLE: Problem(
         409, "Horário indisponível", "Este horário acabou de ser reservado."
     ),
+    ErrorCode.CHANGE_DEADLINE_PASSED: Problem(
+        409,
+        "Prazo de alteração vencido",
+        "O prazo para alterar este agendamento passou. Fale com o negócio.",
+    ),
+    ErrorCode.INVALID_STATUS_TRANSITION: Problem(
+        409,
+        "Alteração não permitida",
+        "O status atual do agendamento não permite esta alteração.",
+    ),
     ErrorCode.IDEMPOTENCY_KEY_REUSED: Problem(
         409,
         "Chave de idempotência já usada",

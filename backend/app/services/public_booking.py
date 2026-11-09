@@ -105,7 +105,7 @@ class BookingOutcome:
     created: bool
 
 
-def _rules_of(business: Business) -> BookingRules:
+def rules_of(business: Business) -> BookingRules:
     return BookingRules(
         timezone=ZoneInfo(business.timezone),
         slot_step_minutes=business.slot_step_minutes,
@@ -114,7 +114,7 @@ def _rules_of(business: Business) -> BookingRules:
     )
 
 
-def _access_url(settings: Settings, raw_token: str) -> str:
+def build_access_url(settings: Settings, raw_token: str) -> str:
     return f"{settings.frontend_base_url}/agendamento/{raw_token}"
 
 
@@ -136,7 +136,7 @@ async def _require_active_service(
     return service
 
 
-async def _eligible_ids(
+async def eligible_ids(
     session: AsyncSession,
     business_id: UUID,
     service_id: UUID,
@@ -164,16 +164,22 @@ async def _eligible_ids(
     )
 
 
-async def _slots_by_professional(
+async def slots_by_professional(
     session: AsyncSession,
     *,
     business: Business,
-    service: Service,
+    duration_minutes: int,
+    preparation_minutes: int,
     professional_ids: Sequence[UUID],
     day: date,
     now: datetime,
 ) -> dict[UUID, list[datetime]]:
-    rules = _rules_of(business)
+    """The free times of each professional for a block of this size.
+
+    A reschedule passes the values copied to the appointment (RN11), and its own
+    appointment still counts as busy (RN18).
+    """
+    rules = rules_of(business)
     if not professional_ids or not is_day_within_advance(day, rules, now):
         return {}
 
@@ -193,8 +199,8 @@ async def _slots_by_professional(
             rules=rules,
             intervals=hours[professional_id],
             busy=[*booked.get(professional_id, []), *blocked.get(professional_id, [])],
-            duration_minutes=service.duration_minutes,
-            preparation_minutes=service.preparation_minutes,
+            duration_minutes=duration_minutes,
+            preparation_minutes=preparation_minutes,
             now=now,
         )
         for professional_id in professional_ids
@@ -246,13 +252,14 @@ async def get_availability(
     """With no professional, gathers the times of everyone eligible."""
     business = await _require_business(session, slug)
     service = await _require_active_service(session, business.id, service_id)
-    professional_ids = await _eligible_ids(
+    professional_ids = await eligible_ids(
         session, business.id, service.id, professional_id, invalid_location="query"
     )
-    slots = await _slots_by_professional(
+    slots = await slots_by_professional(
         session,
         business=business,
-        service=service,
+        duration_minutes=service.duration_minutes,
+        preparation_minutes=service.preparation_minutes,
         professional_ids=professional_ids,
         day=day,
         now=now,
@@ -322,7 +329,7 @@ async def _replay(
             raise AppError(ErrorCode.NOT_FOUND)
         raw_token = generate_opaque_token()
         locked.access_token_hash = hash_opaque_token(raw_token)
-        access_url = _access_url(settings, raw_token)
+        access_url = build_access_url(settings, raw_token)
         email_status = "skipped"
     outcome = await _describe(
         session,
@@ -337,7 +344,7 @@ async def _replay(
     return outcome
 
 
-async def _choose_free_professional(
+async def choose_free_professional(
     session: AsyncSession,
     *,
     business_id: UUID,
@@ -345,13 +352,17 @@ async def _choose_free_professional(
     timezone: ZoneInfo,
     free_ids: Sequence[UUID],
     starts_at: datetime,
+    excluding: UUID | None = None,
 ) -> UUID:
-    """RN10: only consulted among those eligible and free at the requested time."""
+    """RN10: only consulted among those eligible and free at the requested time.
+
+    `excluding` is the appointment being rescheduled, left out of the count (D20).
+    """
     day_start, day_end = local_day_bounds(
         starts_at.astimezone(timezone).date(), timezone
     )
     counts = await appointments.count_by_professional(
-        session, business_id, free_ids, day_start, day_end
+        session, business_id, free_ids, day_start, day_end, excluding=excluding
     )
     eligible = await professionals.list_eligible(session, business_id, service_id)
     chosen = choose_professional(
@@ -394,7 +405,7 @@ async def create_booking(
         return replayed
 
     service = await _require_active_service(session, business.id, service_id)
-    candidates = await _eligible_ids(
+    candidates = await eligible_ids(
         session, business.id, service.id, professional_id, invalid_location="body"
     )
     await professionals.lock_many(session, business.id, candidates)
@@ -409,11 +420,11 @@ async def create_booking(
     await session.refresh(service)
     if not service.is_active:
         raise AppError(ErrorCode.NOT_FOUND)
-    candidates = await _eligible_ids(
+    candidates = await eligible_ids(
         session, business.id, service.id, professional_id, invalid_location="body"
     )
 
-    rules = _rules_of(business)
+    rules = rules_of(business)
     instant = starts_at.astimezone(UTC)
     # First, because an extreme date cannot be converted to the local clock.
     if not is_within_advance(instant, rules, now):
@@ -424,10 +435,11 @@ async def create_booking(
             invalid_field=("starts_at", "this time is not on the grid"),
         )
 
-    slots = await _slots_by_professional(
+    slots = await slots_by_professional(
         session,
         business=business,
-        service=service,
+        duration_minutes=service.duration_minutes,
+        preparation_minutes=service.preparation_minutes,
         professional_ids=candidates,
         day=instant.astimezone(rules.timezone).date(),
         now=now,
@@ -440,7 +452,7 @@ async def create_booking(
     chosen = (
         professional_id
         if professional_id is not None
-        else await _choose_free_professional(
+        else await choose_free_professional(
             session,
             business_id=business.id,
             service_id=service.id,
@@ -494,7 +506,7 @@ async def create_booking(
         session,
         business,
         appointment,
-        access_url=_access_url(settings, raw_token),
+        access_url=build_access_url(settings, raw_token),
         email_status="queued",
         created=True,
     )

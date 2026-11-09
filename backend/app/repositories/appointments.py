@@ -101,19 +101,23 @@ async def count_by_professional(
     professional_ids: Sequence[UUID],
     starts_at: datetime,
     ends_at: datetime,
+    *,
+    excluding: UUID | None = None,
 ) -> dict[UUID, int]:
-    """RN10: appointments that are not cancelled and start in the period."""
-    rows = await session.execute(
-        select(Appointment.professional_id, func.count())
-        .where(
-            Appointment.business_id == business_id,
-            Appointment.professional_id.in_(professional_ids),
-            Appointment.status != AppointmentStatus.CANCELLED,
-            Appointment.starts_at >= starts_at,
-            Appointment.starts_at < ends_at,
-        )
-        .group_by(Appointment.professional_id)
+    """RN10: appointments that are not cancelled and start in the period.
+
+    A reschedule leaves its own appointment out of the count (D20).
+    """
+    query = select(Appointment.professional_id, func.count()).where(
+        Appointment.business_id == business_id,
+        Appointment.professional_id.in_(professional_ids),
+        Appointment.status != AppointmentStatus.CANCELLED,
+        Appointment.starts_at >= starts_at,
+        Appointment.starts_at < ends_at,
     )
+    if excluding is not None:
+        query = query.where(Appointment.id != excluding)
+    rows = await session.execute(query.group_by(Appointment.professional_id))
     return {professional_id: count for professional_id, count in rows}
 
 
@@ -142,3 +146,25 @@ async def lock(
         .with_for_update()
         .execution_options(populate_existing=True)
     )
+
+
+def _by_access_token_hash(token_hash: str) -> Select[Appointment]:
+    """The customer link is the entry point, like a slug: no business_id yet."""
+    return (
+        select(Appointment)
+        .where(Appointment.access_token_hash == token_hash)
+        .execution_options(populate_existing=True)
+    )
+
+
+async def get_by_access_token_hash(
+    session: AsyncSession, token_hash: str
+) -> Appointment | None:
+    return await session.scalar(_by_access_token_hash(token_hash))
+
+
+async def lock_by_access_token_hash(
+    session: AsyncSession, token_hash: str
+) -> Appointment | None:
+    """None also when a repeat replaced the token while this one waited (D11)."""
+    return await session.scalar(_by_access_token_hash(token_hash).with_for_update())

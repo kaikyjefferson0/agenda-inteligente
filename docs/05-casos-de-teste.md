@@ -54,6 +54,10 @@ O merge é bloqueado abaixo de:
 | CT12 | Cancelar ou remarcar antes do prazo, no limite exato e depois dele | Aceito, aceito e recusado | Unidade e integração |
 | CT13 | Remarcar para horário ocupado | Recusado, e o horário original continua válido | Integração |
 | CT14 | Remarcar para horário livre | Troca atômica, e o horário antigo é liberado | Integração |
+| CT47 | Cancelar ou remarcar agendamento em status final, inclusive cancelar duas vezes | `409 INVALID_STATUS_TRANSITION` (D19) | Unidade e integração |
+| CT48 | Remarcar depois de o serviço ser desativado | `409`, com o original mantido; cancelar continua permitido (D21) | Unidade e integração |
+| CT49 | Consulta pelo link | Não devolve nome, e-mail nem telefone do cliente, e as respostas, inclusive as de erro, levam `Cache-Control: no-store` e `Referrer-Policy: no-referrer` (D17, D22) | Integração |
+| CT50 | Requisições às rotas do link | O token não aparece nos logs de acesso (D24) | Integração |
 
 ### Equipe
 
@@ -124,9 +128,9 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC09 | CT17, CT31 |
 | UC10 | CT01, CT02, CT03, CT04, CT05 |
 | UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, CT36, E2E01 |
-| UC12 | CT11, E2E01 |
-| UC13 | CT03, CT12, E2E01 |
-| UC14 | CT10, CT12, CT13, CT14 |
+| UC12 | CT11, CT36, CT49, CT50, E2E01 |
+| UC13 | CT03, CT12, CT47, CT48, CT49, E2E01 |
+| UC14 | CT10, CT12, CT13, CT14, CT47, CT48, CT49 |
 | UC15 | CT20, E2E02 |
 | UC16 | CT15, CT16, CT35 |
 | UC17 | CT33, CT34, CT35 |

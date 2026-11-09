@@ -242,6 +242,94 @@ Content-Type: application/json
 - Mesma chave com dados diferentes responde `409 IDEMPOTENCY_KEY_REUSED`. A comparação usa os dados como foram enviados, depois de validados: o mesmo instante com outro deslocamento e o e-mail com outra caixa contam como dados diferentes.
 - A chave só fica registrada quando o agendamento é criado. Depois de uma recusa, ela pode ser usada de novo.
 
+### Link do cliente
+
+`GET /public/appointments/{token}`, `POST /public/appointments/{token}/cancel` e `POST /public/appointments/{token}/reschedule` respondem `200`. O token é o último segmento de `access_url` e é procurado pelo hash.
+
+#### Exemplo: consulta pelo link
+
+```json
+{
+  "id": "a1b2c3d4-0000-4000-8000-000000000001",
+  "status": "confirmed",
+  "starts_at": "2026-11-10T09:00:00-03:00",
+  "ends_at": "2026-11-10T09:30:00-03:00",
+  "business": {
+    "name": "Barbearia Demo",
+    "slug": "barbearia-demo",
+    "timezone": "America/Sao_Paulo"
+  },
+  "service": {
+    "id": "2c9e7d1a-6b1f-4f7e-9a51-3d8f1b7e4c20",
+    "name": "Corte",
+    "duration_minutes": 30,
+    "price_cents": 5000
+  },
+  "professional": { "id": "5d0c7e42-0000-4000-8000-000000000002", "name": "Profissional Demo" },
+  "can_cancel": true,
+  "can_reschedule": true,
+  "change_deadline_at": "2026-11-10T07:00:00-03:00"
+}
+```
+
+- O nome do serviço é o atual; `duration_minutes` e `price_cents` são os copiados na reserva (RN11).
+- `change_deadline_at` é o início atual menos o prazo de alteração do negócio (RN17), no fuso do negócio.
+- `can_cancel` vale `true` com o agendamento `confirmed` e dentro do prazo; `can_reschedule` exige, além disso, o serviço ativo (D21).
+- A resposta não traz nenhum dado do cliente: nem nome, nem e-mail, nem telefone.
+
+#### Exemplo: remarcar
+
+```http
+POST /api/v1/public/appointments/<token>/reschedule
+Content-Type: application/json
+
+{
+  "starts_at": "2026-11-10T14:00:00-03:00",
+  "professional_id": null
+}
+```
+
+```json
+{
+  "id": "a1b2c3d4-0000-4000-8000-000000000001",
+  "status": "confirmed",
+  "starts_at": "2026-11-10T14:00:00-03:00",
+  "ends_at": "2026-11-10T14:30:00-03:00",
+  "business": {
+    "name": "Barbearia Demo",
+    "slug": "barbearia-demo",
+    "timezone": "America/Sao_Paulo"
+  },
+  "service": {
+    "id": "2c9e7d1a-6b1f-4f7e-9a51-3d8f1b7e4c20",
+    "name": "Corte",
+    "duration_minutes": 30,
+    "price_cents": 5000
+  },
+  "professional": { "id": "5d0c7e42-0000-4000-8000-000000000002", "name": "Profissional Demo" },
+  "can_cancel": true,
+  "can_reschedule": true,
+  "change_deadline_at": "2026-11-10T12:00:00-03:00",
+  "email_status": "queued"
+}
+```
+
+- `starts_at` é obrigatório. `professional_id` é opcional: `null` segue a RN10, e a contagem do dia ignora o próprio agendamento.
+- A remarcação é uma troca atômica na mesma linha, com o mesmo link e os mesmos valores copiados (RN18). O cancelamento não tem corpo e responde no mesmo formato, com `status: "cancelled"`.
+- `email_status` vale `queued` quando o e-mail de cancelamento ou de remarcação foi enfileirado, ou `skipped` quando um limite de envio foi atingido. Nesse caso, a operação vale do mesmo jeito e nada é enfileirado (RN26). Os e-mails não levam o nome do cliente, e o de remarcação leva o mesmo link.
+- A remarcação não usa `Idempotency-Key`: repeti-la cai sobre o próprio horário e responde `409`.
+
+Recusas, em ordem. Antes delas, um corpo com formato inválido ou campo desconhecido responde `422`, sem consultar o token:
+
+- **Link inválido (D18):** token inexistente, malformado, adulterado, substituído ou expirado, mais de 30 dias depois do início, responde `404 NOT_FOUND`, sempre com o mesmo corpo.
+- **Status (D19):** agendamento fora de `confirmed`, inclusive já cancelado, responde `409 INVALID_STATUS_TRANSITION`.
+- **Prazo (D19):** `agora > início atual - prazo` responde `409 CHANGE_DEADLINE_PASSED`. O limite exato é permitido.
+- **Serviço desativado (D21):** a remarcação responde `409 SLOT_UNAVAILABLE`; o cancelamento continua permitido.
+- **Corpo da remarcação (D20):** `starts_at` fora da grade, `422`; profissional inexistente ou de outro negócio, `404`; profissional que não atende o serviço ou com `is_bookable = false`, `422`; horário ocupado, fora do expediente, fora da antecedência ou sobrepondo o horário atual, `409 SLOT_UNAVAILABLE`. Em qualquer recusa, o agendamento original fica intacto.
+- **Limite (D22):** as três rotas compartilham um contador de 60 requisições por minuto por IP, e toda requisição conta, inclusive `404` e `422`. Acima dele, `429` com `Retry-After`.
+
+Todas as respostas dessas rotas, inclusive as de erro, levam `Cache-Control: no-store` e `Referrer-Policy: no-referrer` (D22). A exceção é o `500 INTERNAL_ERROR` genérico, montado pelo Starlette fora do middleware que acrescenta esses cabeçalhos: ele sai sem eles, mas tem corpo fixo, sem o token nem dados do agendamento. O log de acesso registra o caminho com o token trocado por `***` (D24).
+
 ## Infraestrutura
 
 | Rota | Função | Sucesso |
