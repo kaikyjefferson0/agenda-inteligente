@@ -104,11 +104,13 @@ Falhas possíveis:
 
 O padrão outbox grava o e-mail na mesma transação da operação, então nenhum e-mail se perde nem é enviado por uma operação desfeita.
 
-- São até 5 tentativas com espera crescente. Depois disso, a mensagem fica como `failed`, com `last_error`.
-- O worker apaga o `payload` na mesma escrita que muda o status para `sent` ou para `failed`, porque ele pode conter um token bruto. Uma restrição `CHECK` no banco recusa a escrita que não fizer isso.
-- O envio é "pelo menos uma vez". O `id` da mensagem é usado como chave de idempotência, quando o provedor oferece esse recurso.
-- `FOR UPDATE SKIP LOCKED` permite vários workers, sem Redis.
-- O provedor é o Resend, atrás de uma interface que permite trocá-lo. Os testes usam um adaptador falso.
+- **Reserva (D38):** a cada 5 segundos, o worker seleciona até 20 mensagens `pending` com `next_attempt_at <= agora`, ordenadas por `next_attempt_at`, com `FOR UPDATE SKIP LOCKED`, o que permite vários workers sem Redis. Na mesma transação, soma 1 em `attempts`, adia `next_attempt_at` em 5 minutos e confirma. Só então envia cada mensagem, fora de transação, e grava o resultado em uma transação curta. Um lote cheio é seguido na hora pelo próximo.
+- **Pelo menos uma vez:** se o worker cair no meio, a reserva vence e a mensagem é pega de novo. O `id` da mensagem vai como chave de idempotência ao Resend, que descarta a repetição. O resultado só é gravado pela reserva que enviou a mensagem: um worker mais lento que a própria reserva não sobrescreve o resultado de outro.
+- **Tentativas (D39):** no máximo 5. Depois de uma falha temporária (erro de rede, timeout, `429` ou `5xx`), a próxima tentativa fica para daqui a 1, 5, 15 e 60 minutos, conforme a tentativa. Falha permanente (outro `4xx` ou endereço recusado pelo SMTP), assim como um `payload` que não serve ao template, vira `failed` na hora.
+- **Expiração:** mensagem `pending` criada há mais de 24 horas vira `failed` com `last_error = "expired"`, sem envio. Um aviso de horário atrasado demais já não ajuda o cliente.
+- **Payload:** o worker apaga o `payload` na mesma escrita que muda o status para `sent` ou para `failed`, porque ele pode conter um token bruto. Uma restrição `CHECK` no banco recusa a escrita que não fizer isso. `sent_at` é preenchido no envio.
+- **Logs (D40):** o worker registra apenas `id`, template, status e número da tentativa. `last_error` guarda só o tipo do erro e o código HTTP, como `"HTTPStatusError 503"`, com no máximo 200 caracteres; nunca o destinatário, o link, o `payload` nem o corpo da resposta do provedor.
+- **Adaptadores (D34):** o worker só conhece a interface `EmailSender`. `EMAIL_BACKEND` escolhe entre `smtp` (Mailpit no desenvolvimento), `fake` (mensagens em memória, nos testes) e `resend` (produção). Os textos vêm de funções puras em `app/email/`, em português, com os nomes digitados pelo Dono escapados no HTML (D37).
 
 ## Segurança
 
@@ -162,7 +164,7 @@ A demo guarda apenas nome, e-mail e telefone do agendamento, e a restauração n
 
 ## Ambiente local
 
-O `docker-compose.yml` sobe `db`, `api`, `worker` e `frontend`. Em desenvolvimento, o e-mail usa um adaptador que apenas registra a mensagem no log. Os segredos ficam em variáveis de ambiente, e o repositório inclui somente um `.env.example`.
+O `docker-compose.yml` sobe `db`, `api`, `worker`, `mailpit` e `frontend`. O `worker` usa o mesmo build e as mesmas variáveis da `api` e roda `python -m app.jobs.email_worker`; ele para de forma limpa com `SIGTERM` e `SIGINT`. Em desenvolvimento, o e-mail vai por SMTP ao Mailpit, um servidor de e-mail falso cuja interface web, em `http://localhost:8025`, mostra as mensagens enviadas. As portas do Mailpit (8025 e 1025) ficam publicadas só em `127.0.0.1`. Nada é gravado no log, porque as mensagens levam links com token e o e-mail do cliente (D35). Os segredos ficam em variáveis de ambiente, e o repositório inclui somente um `.env.example`.
 
 Variáveis principais:
 
@@ -171,8 +173,10 @@ Variáveis principais:
 | `DATABASE_URL` | Conexão com o banco |
 | `JWT_SECRET` | Assinatura do token de acesso, com ao menos 32 caracteres |
 | `RATE_LIMIT_KEY_SECRET` | HMAC dos contadores de limite, com ao menos 32 caracteres |
-| `RESEND_API_KEY` | Envio de e-mails |
-| `EMAIL_BACKEND` | `console`, `fake` ou `resend` |
+| `EMAIL_BACKEND` | `smtp` (padrão), `fake` ou `resend` |
+| `EMAIL_FROM` | Remetente dos e-mails; padrão `Agenda Inteligente <nao-responda@localhost>` |
+| `SMTP_HOST`, `SMTP_PORT` | Servidor SMTP; padrão `mailpit` e `1025` |
+| `RESEND_API_KEY` | Chave do Resend; obrigatória com `EMAIL_BACKEND=resend`, sem ela a aplicação não sobe |
 | `EMAIL_DAILY_CAP`, `EMAIL_RECIPIENT_DAILY_CAP` | Limites de envio |
 | `REGISTRATION_ENABLED` | Liga o cadastro de negócios |
 | `CORS_ALLOWED_ORIGINS` | Origens permitidas, separadas por vírgula |

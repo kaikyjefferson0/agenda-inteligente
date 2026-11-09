@@ -31,6 +31,26 @@ services:
       db:
         condition: service_healthy
 
+  # Same build and variables as the api. Without --reload: restart it after
+  # changing the code.
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.jobs.email_worker"]
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Fake mail server for development (D35): the web interface lists every
+  # message the worker sends over SMTP. Published only on this machine.
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
   frontend:
     build: ./frontend
     environment:
