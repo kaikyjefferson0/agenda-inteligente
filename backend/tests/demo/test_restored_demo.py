@@ -160,20 +160,34 @@ async def test_ct65_the_agenda_has_past_and_future_appointments(
 async def test_a_public_booking_on_a_free_time_is_accepted(
     client: AsyncClient, clock: Clock, demo: None
 ) -> None:
+    # Both professionals do the Corte (RN10): without a professional the list
+    # is their union, and the other one may still be free at the booked time.
     haircut = str(content.HAIRCUT.id)
+    owner = str(content.OWNER.professional_id)
     day = next_working_day(clock.now).isoformat()
-    free = offered(await get_availability(client, haircut, day, slug=content.SLUG))
+    free = offered(
+        await get_availability(
+            client, haircut, day, professional_id=owner, slug=content.SLUG
+        )
+    )
 
     response = await post_booking(
-        client, booking_body(haircut, free[0]), slug=content.SLUG
+        client,
+        booking_body(haircut, free[0], professional_id=owner),
+        slug=content.SLUG,
     )
 
     assert response.status_code == 201, response.text
     assert response.json()["starts_at"] == free[0]
+    assert response.json()["professional"] == {"name": content.OWNER.name}
     assert response.json()["access_url"]
     # D15: the booking works as in any business, e-mail included.
-    after = offered(await get_availability(client, haircut, day, slug=content.SLUG))
-    assert len(after) < len(free)
+    after = offered(
+        await get_availability(
+            client, haircut, day, professional_id=owner, slug=content.SLUG
+        )
+    )
+    assert free[0] not in after
 
 
 # CT32 on the restored demo
