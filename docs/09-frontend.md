@@ -1,6 +1,6 @@
 # 9. Frontend
 
-SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões desta etapa são a D50 a D58 dos [Pontos a revisar](README.md#pontos-a-revisar).
+SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D62 dos [Pontos a revisar](README.md#pontos-a-revisar).
 
 ## Estrutura de pastas
 
@@ -17,7 +17,7 @@ frontend/src/
 │   └── marketing/# Seção principal da página inicial (Magic, D58)
 ├── features/     # Vazia nesta etapa: cada etapa seguinte cria a sua pasta
 ├── hooks/        # Hooks compartilhados, como o use-mobile do sidebar
-├── lib/          # Funções puras: datas e fusos, esquema de cores e utilitários
+├── lib/          # Funções puras: datas e fusos, esquema de cores, prévia da demo e utilitários
 ├── pages/        # Páginas por grupo de rotas: public/, account/, panel/ e a 404
 └── test/         # Configuração do Vitest e servidor do MSW com os handlers
 ```
@@ -87,13 +87,75 @@ O cliente já aceita um provedor de token de acesso, `setAccessTokenProvider(() 
 
 **A renovação de sessão precisa ser única entre abas.** O refresh tem rotação sem tolerância: duas chamadas simultâneas com o mesmo cookie, como ao recarregar duas abas, são tratadas como reuso e encerram a sessão. A etapa de login deve serializar `/auth/refresh` entre abas, por exemplo com a Web Locks API, e reler o resultado obtido pela aba que renovou ([Arquitetura](08-arquitetura.md#frontend), UC02).
 
-## Identidade visual (D55)
+## Identidade visual (D55, D59 a D62)
 
-- **Cores:** *teal* como cor principal e *stone* nos neutros, definidos como tokens do shadcn em `src/index.css`, em OKLCH, com os valores da paleta do Tailwind. No claro, a cor principal é o teal-700; no escuro, o teal-400. Todos os pares de texto e fundo dos tokens passam de 4.5:1 nos dois modos, e o anel de foco passa de 3:1.
-- **Forma e fonte:** raio de 0.75rem e fonte Geist.
-- **Claro e escuro:** seguem a preferência do sistema. `src/lib/color-scheme.ts` aplica a classe `dark` em `<html>` e acompanha mudanças, então um botão pode entrar depois sem mudar o CSS.
-- **Layouts:** o público (`PublicLayout`) é pensado para celular a partir de 360 px. O painel (`PanelLayout`) usa o sidebar do shadcn: menu lateral a partir de 768 px e gaveta abaixo disso.
-- **Acessibilidade:** `lang="pt-BR"`, link "Pular para o conteúdo" em cada layout, foco sempre visível (os componentes do shadcn têm anel próprio, e links e elementos com `tabindex` ganham contorno) e textos de leitores de tela traduzidos nos componentes do shadcn.
+Agendamento para barbearia, salão e estética: o cliente marca pelo celular, e a equipe usa o painel no balcão, sob luz forte. A direção é **vinho e eucalipto sobre porcelana**: vinho (couro da cadeira de barbeiro, o "marsala" do salão) como cor de ação, eucalipto (spa, toalha verde) como cor de apoio e de sucesso, e neutros de porcelana levemente rosados, sem creme. Os valores ficam em `src/index.css`, que é a referência do design system (D62).
+
+### Cores
+
+Tokens do shadcn em OKLCH, mais os de sucesso (D60). Claro e escuro seguem a preferência do sistema: `src/lib/color-scheme.ts` aplica a classe `dark` em `<html>` e acompanha mudanças, então um botão pode entrar depois sem mudar o CSS.
+
+| Token | Claro | Escuro | Uso |
+|---|---|---|---|
+| `primary` | `oklch(0.43 0.125 5)` | `oklch(0.79 0.085 5)` | Vinho; no escuro, a versão clara (rosé). Botão principal, links, item ativo |
+| `accent` / `accent-foreground` | `0.95 0.022 5` / `0.40 0.115 5` | `0.29 0.05 5` / `0.89 0.05 5` | Hover, item ativo do menu, horário escolhido |
+| `success` / `success-foreground` | `0.47 0.075 168` / `0.99 0.004 350` | `0.78 0.09 168` / `0.20 0.035 168` | Eucalipto: só apoio e sucesso, nunca uma segunda cor de ação |
+| `success-soft` / `success-soft-foreground` | `0.95 0.025 168` / `0.38 0.065 168` | `0.27 0.04 168` / `0.86 0.07 168` | Selos "Confirmado" e "Concluído" |
+| `destructive` | `oklch(0.53 0.155 42)` | `oklch(0.77 0.12 42)` | Vermelhão, de matiz alaranjado, longe do vinho |
+| `background` / `foreground` | `0.99 0.004 350` / `0.22 0.025 355` | `0.165 0.012 355` / `0.965 0.005 355` | Porcelana e tinta |
+| `muted-foreground` | `0.48 0.022 355` | `0.74 0.018 355` | Texto de apoio |
+| `input` | `0.64 0.015 355` | `0.52 0.016 355` | Borda de campo e fundos `bg-input/*`, nunca texto. Opaca: um branco translúcido se mistura em sRGB e fica abaixo de 3:1 |
+| `ring` | `0.53 0.14 5` | `0.70 0.12 5` | Anel de foco (D61) |
+
+Contraste medido na página renderizada, com o chrome-devtools:
+
+| Par | Claro | Escuro | Mínimo |
+|---|---|---|---|
+| `foreground` / `background` | 16.94 | 17.40 | 4.5 |
+| `muted-foreground` / `background` | 6.42 | 8.29 | 4.5 |
+| `muted-foreground` / `muted` | 5.92 | 6.80 | 4.5 |
+| `primary-foreground` / `primary` | 8.45 | 8.96 | 4.5 |
+| `primary` / `background` (texto e links) | 8.45 | 9.62 | 4.5 |
+| `accent-foreground` / `accent` | 8.44 | 10.19 | 4.5 |
+| `destructive` / `background` | 5.48 | 8.98 | 4.5 |
+| `destructive` / fundo `destructive/10` | 4.75 | 7.75 | 4.5 |
+| `success-foreground` / `success` | 6.39 | 9.30 | 4.5 |
+| `success-soft-foreground` / `success-soft` | 8.46 | 9.90 | 4.5 |
+| `foreground` / `sidebar` | 16.15 | 16.71 | 4.5 |
+| `ring` / `background`, `card` e `muted` | 5.54 / 5.70 / 5.11 | 6.81 / 6.36 / 5.59 | 3 |
+| `input` / `background` | 3.28 | 3.47 | 3 |
+
+- **Ação destrutiva:** sempre com ícone e texto, nunca só a cor, e nunca como botão sólido ao lado do principal. A variante `destructive` do botão e do selo usa fundo `/10` nos dois modos, e o hover muda a borda em vez de escurecer o fundo (D58).
+- **Gráficos:** `chart-1` a `chart-5` alternam vinho e eucalipto, para quando houver gráficos.
+
+### Tipografia (D59)
+
+- **Geist** (`--font-sans`) no corpo, nos formulários, nos botões e nos horários. Horários e preços usam `tabular-nums`.
+- **Bricolage Grotesque** (`--font-heading`) só em títulos: `h1` e `h2`, títulos de card e de sheet, nome do negócio e a marca. Entrou só o eixo de peso (41 KB no latim); o arquivo com tamanho óptico pesava quase o dobro.
+- Escala: `h1` de 2.375rem no celular a 3.25rem no desktop, com altura de linha 1.05; `h2` de 1.75rem a 1.875rem; `h3` em 1.125rem, Geist 600; corpo em 1rem com altura de linha 1.5; nada abaixo de 0.75rem. Os títulos usam `letter-spacing: -0.015em` e `text-wrap: balance`.
+- As duas fontes vêm do `@fontsource`, com versão exata (D50), sem CDN.
+
+### Forma, sombras e movimento (D60)
+
+- **Raio:** `--radius` de 0.625rem: 10 px em botões e campos, 14 px em cards (`rounded-xl`) e pílula nos horários e selos.
+- **Sombras:** `shadow-xs` a `shadow-lg` em duas camadas, tingidas com a cor do texto no claro. No escuro, a elevação vem da superfície mais clara, da borda e de um brilho no topo.
+- **Movimento:** `--duration-fast` (120 ms, hover e toque), `--duration-base` (200 ms) e `--duration-slow` (300 ms, gavetas), com `ease-enter` (`cubic-bezier(0.2, 0, 0, 1)`) e `ease-exit` (`cubic-bezier(0.4, 0, 1, 1)`). Só CSS e `tw-animate-css`. Com `prefers-reduced-motion: reduce`, animações e transições ficam instantâneas.
+- **Navegador:** seleção de texto, cursor de digitação, `accent-color`, barra de rolagem e sublinhado dos links seguem a paleta.
+
+### Foco e acessibilidade (D61)
+
+- **Foco:** todo `:focus-visible` recebe contorno sólido de 2 px em `--ring`, deslocado 2 px. A regra fica fora das camadas do Tailwind, então vence o `outline-none` dos componentes do shadcn; o halo deles continua como enfeite. O deslocamento faz o anel ser medido contra o fundo da página, e não contra o vinho do botão.
+- **Diálogos:** o contêiner que o Radix foca ao abrir um diálogo (`role="dialog"` com `tabindex="-1"`) não recebe o contorno, porque não é um controle.
+- **Gaveta do painel:** fecha com Esc, tocando fora ou escolhendo um item, como no shadcn. O Radix só devolve o foco a um `SheetTrigger`, e o Sidebar abre a gaveta com um botão comum; por isso o botão "Menu" retoma o foco ao fechar, assim que o Radix tira o `aria-hidden` do resto da página.
+- **Toque:** alvos de pelo menos 44 px nas páginas públicas e no painel abaixo de 768 px (cabeçalho, botão "Menu" com rótulo e itens da gaveta). A partir de 768 px, o menu lateral volta à densidade do shadcn.
+- `lang="pt-BR"`, link "Pular para o conteúdo" em cada layout e textos de leitores de tela traduzidos nos componentes do shadcn.
+
+### Layouts e página inicial
+
+- **Público** (`PublicLayout`): pensado para celular a partir de 360 px. O rodapé é o único lugar que cita o projeto de portfólio.
+- **Painel** (`PanelLayout`): sidebar do shadcn, com menu lateral a partir de 768 px e gaveta abaixo disso.
+- **Marca** (`Brand`): glifo próprio em SVG, com três fichas de horário e a do meio escolhida.
+- **Página inicial:** texto para o dono do negócio. A prévia da hero é uma ilustração estática numa moldura de celular, escondida dos leitores de tela; os horários não têm borda, hover nem cursor de clique. A data mostrada é o próximo dia de expediente da demo, a partir de hoje no fuso do negócio (`src/lib/demo-preview.ts`). "Como funciona" mostra três passos, cada um com um recorte da interface em vez de ícone.
 
 ## Datas e fusos (D56)
 
@@ -127,6 +189,7 @@ npm run api:types      # regenera src/api/schema.d.ts
 
 ## Uso dos MCPs (D58)
 
-- **shadcn:** consulte os componentes pelo MCP e instale com `npx shadcn add <nome>`. Eles ficam em `src/components/ui` e só mudam para traduzir textos ou atender às regras de lint.
-- **Magic:** só em componentes de destaque. Nesta etapa, apenas a seção principal de `/` (`src/components/marketing/HeroSection.tsx`). O resultado é adaptado aos tokens da D55, sem cores fixas e sem dependências fora da D50.
-- **chrome-devtools:** cada página nova ou alterada é conferida em 375 px e 1280 px, nos modos claro e escuro, sem rolagem horizontal e sem erros no console.
+- **shadcn:** consulte os componentes pelo MCP e instale com `npx shadcn add <nome>`. Eles ficam em `src/components/ui` e só mudam para traduzir textos, atender às regras de lint ou alcançar o contraste AA (como a variante `destructive` do botão e do selo).
+- **Magic:** só em componentes de destaque, como a seção principal de `/` e, nas próximas etapas, a escolha de horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion.
+- **chrome-devtools:** cada página nova ou alterada é conferida em 375 px e 1280 px, nos modos claro e escuro, sem rolagem horizontal, sem erros no console, com o contraste dos pares da tabela medido na página e o foco conferido pelo teclado.
+- **Arquivos de design system (D62):** nada de `design-system/`, `PRODUCT.md` ou `DESIGN.md` no repositório. A referência é `src/index.css` mais esta seção.

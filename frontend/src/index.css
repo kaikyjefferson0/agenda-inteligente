@@ -2,12 +2,14 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/bricolage-grotesque";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    /* D59: Bricolage only in titles; Geist in body, forms, buttons and times. */
+    --font-heading: 'Bricolage Grotesque Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -21,6 +23,10 @@
     --color-chart-3: var(--chart-3);
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
+    --color-success-soft-foreground: var(--success-soft-foreground);
+    --color-success-soft: var(--success-soft);
+    --color-success-foreground: var(--success-foreground);
+    --color-success: var(--success);
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
@@ -46,95 +52,168 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    /* D60: soft two-layer shadows, tinted with the ink of each mode. */
+    --shadow-xs: var(--elevation-xs);
+    --shadow-sm: var(--elevation-sm);
+    --shadow-md: var(--elevation-md);
+    --shadow-lg: var(--elevation-lg);
+    /* D60: enter decelerates, exit accelerates and is shorter. */
+    --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
-/* D55: teal as the main color and stone as the neutrals (Tailwind palette, OKLCH).
-   Text pairs keep at least the AA contrast (4.5:1) in both modes. */
+/* D55: wine as the main color, eucalyptus for support and success, and
+   porcelain neutrals (hue 355). Every text pair keeps at least 4.5:1, the
+   field border and the focus ring at least 3:1, in both modes. */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.147 0.004 49.25); /* stone-950 */
+    --background: oklch(0.99 0.004 350);
+    --foreground: oklch(0.22 0.025 355);
     --card: oklch(1 0 0);
-    --card-foreground: oklch(0.147 0.004 49.25);
+    --card-foreground: oklch(0.22 0.025 355);
     --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.147 0.004 49.25);
-    --primary: oklch(0.511 0.096 186.391); /* teal-700 */
-    --primary-foreground: oklch(0.984 0.014 180.72); /* teal-50 */
-    --secondary: oklch(0.97 0.001 106.424); /* stone-100 */
-    --secondary-foreground: oklch(0.216 0.006 56.043); /* stone-900 */
-    --muted: oklch(0.97 0.001 106.424);
-    --muted-foreground: oklch(0.444 0.011 73.639); /* stone-600 */
-    --accent: oklch(0.953 0.051 180.801); /* teal-100 */
-    --accent-foreground: oklch(0.386 0.063 188.416); /* teal-900 */
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.923 0.003 48.717); /* stone-200 */
-    --input: oklch(0.869 0.005 56.366); /* stone-300 */
-    --ring: oklch(0.6 0.118 184.704); /* teal-600 */
-    --chart-1: oklch(0.855 0.138 181.071);
-    --chart-2: oklch(0.704 0.14 182.503);
-    --chart-3: oklch(0.6 0.118 184.704);
-    --chart-4: oklch(0.511 0.096 186.391);
-    --chart-5: oklch(0.386 0.063 188.416);
-    --radius: 0.75rem;
-    --sidebar: oklch(0.985 0.001 106.423); /* stone-50 */
-    --sidebar-foreground: oklch(0.147 0.004 49.25);
-    --sidebar-primary: oklch(0.511 0.096 186.391);
-    --sidebar-primary-foreground: oklch(0.984 0.014 180.72);
-    --sidebar-accent: oklch(0.953 0.051 180.801);
-    --sidebar-accent-foreground: oklch(0.386 0.063 188.416);
-    --sidebar-border: oklch(0.923 0.003 48.717);
-    --sidebar-ring: oklch(0.6 0.118 184.704);
+    --popover-foreground: oklch(0.22 0.025 355);
+    --primary: oklch(0.43 0.125 5); /* wine */
+    --primary-foreground: oklch(0.99 0.004 350);
+    --secondary: oklch(0.962 0.007 355);
+    --secondary-foreground: oklch(0.22 0.025 355);
+    --muted: oklch(0.962 0.007 355);
+    --muted-foreground: oklch(0.48 0.022 355);
+    --accent: oklch(0.95 0.022 5);
+    --accent-foreground: oklch(0.40 0.115 5);
+    --destructive: oklch(0.53 0.155 42); /* vermilion, far from the wine */
+    --success: oklch(0.47 0.075 168); /* eucalyptus */
+    --success-foreground: oklch(0.99 0.004 350);
+    --success-soft: oklch(0.95 0.025 168);
+    --success-soft-foreground: oklch(0.38 0.065 168);
+    --border: oklch(0.912 0.009 355);
+    --input: oklch(0.64 0.015 355);
+    --ring: oklch(0.53 0.14 5);
+    --chart-1: oklch(0.43 0.125 5);
+    --chart-2: oklch(0.47 0.075 168);
+    --chart-3: oklch(0.62 0.11 5);
+    --chart-4: oklch(0.65 0.07 168);
+    --chart-5: oklch(0.80 0.06 5);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.975 0.006 355);
+    --sidebar-foreground: oklch(0.22 0.025 355);
+    --sidebar-primary: oklch(0.43 0.125 5);
+    --sidebar-primary-foreground: oklch(0.99 0.004 350);
+    --sidebar-accent: oklch(0.95 0.022 5);
+    --sidebar-accent-foreground: oklch(0.40 0.115 5);
+    --sidebar-border: oklch(0.912 0.009 355);
+    --sidebar-ring: oklch(0.53 0.14 5);
+    --elevation-xs: 0 1px 2px oklch(0.22 0.025 355 / 0.06);
+    --elevation-sm: 0 1px 2px oklch(0.22 0.025 355 / 0.06), 0 1px 3px oklch(0.22 0.025 355 / 0.08);
+    --elevation-md: 0 2px 4px oklch(0.22 0.025 355 / 0.05), 0 6px 16px -4px oklch(0.22 0.025 355 / 0.10);
+    --elevation-lg: 0 4px 8px oklch(0.22 0.025 355 / 0.04), 0 16px 32px -8px oklch(0.22 0.025 355 / 0.14);
+    /* D60: hover and press, small changes, drawers and sheets. */
+    --duration-fast: 120ms;
+    --duration-base: 200ms;
+    --duration-slow: 300ms;
 }
 
 .dark {
-    --background: oklch(0.147 0.004 49.25); /* stone-950 */
-    --foreground: oklch(0.985 0.001 106.423); /* stone-50 */
-    --card: oklch(0.216 0.006 56.043); /* stone-900 */
-    --card-foreground: oklch(0.985 0.001 106.423);
-    --popover: oklch(0.216 0.006 56.043);
-    --popover-foreground: oklch(0.985 0.001 106.423);
-    --primary: oklch(0.777 0.152 181.912); /* teal-400 */
-    --primary-foreground: oklch(0.277 0.046 192.524); /* teal-950 */
-    --secondary: oklch(0.268 0.007 34.298); /* stone-800 */
-    --secondary-foreground: oklch(0.985 0.001 106.423);
-    --muted: oklch(0.268 0.007 34.298);
-    --muted-foreground: oklch(0.709 0.01 56.259); /* stone-400 */
-    --accent: oklch(0.277 0.046 192.524); /* teal-950 */
-    --accent-foreground: oklch(0.91 0.096 180.426); /* teal-200 */
-    --destructive: oklch(0.704 0.191 22.216);
+    --background: oklch(0.165 0.012 355);
+    --foreground: oklch(0.965 0.005 355);
+    --card: oklch(0.205 0.015 355);
+    --card-foreground: oklch(0.965 0.005 355);
+    --popover: oklch(0.205 0.015 355);
+    --popover-foreground: oklch(0.965 0.005 355);
+    --primary: oklch(0.79 0.085 5); /* rosé: the light version of the wine */
+    --primary-foreground: oklch(0.21 0.045 5);
+    --secondary: oklch(0.255 0.016 355);
+    --secondary-foreground: oklch(0.965 0.005 355);
+    --muted: oklch(0.255 0.016 355);
+    --muted-foreground: oklch(0.74 0.018 355);
+    --accent: oklch(0.29 0.05 5);
+    --accent-foreground: oklch(0.89 0.05 5);
+    --destructive: oklch(0.77 0.12 42);
+    --success: oklch(0.78 0.09 168);
+    --success-foreground: oklch(0.20 0.035 168);
+    --success-soft: oklch(0.27 0.04 168);
+    --success-soft-foreground: oklch(0.86 0.07 168);
     --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.704 0.14 182.503); /* teal-500 */
-    --chart-1: oklch(0.855 0.138 181.071);
-    --chart-2: oklch(0.704 0.14 182.503);
-    --chart-3: oklch(0.6 0.118 184.704);
-    --chart-4: oklch(0.511 0.096 186.391);
-    --chart-5: oklch(0.386 0.063 188.416);
-    --sidebar: oklch(0.216 0.006 56.043);
-    --sidebar-foreground: oklch(0.985 0.001 106.423);
-    --sidebar-primary: oklch(0.777 0.152 181.912);
-    --sidebar-primary-foreground: oklch(0.277 0.046 192.524);
-    --sidebar-accent: oklch(0.277 0.046 192.524);
-    --sidebar-accent-foreground: oklch(0.91 0.096 180.426);
+    --input: oklch(0.52 0.016 355); /* opaque: a translucent white blends in sRGB and stays below 3:1 */
+    --ring: oklch(0.70 0.12 5);
+    --chart-1: oklch(0.79 0.085 5);
+    --chart-2: oklch(0.78 0.09 168);
+    --chart-3: oklch(0.65 0.11 5);
+    --chart-4: oklch(0.62 0.07 168);
+    --chart-5: oklch(0.50 0.09 5);
+    --sidebar: oklch(0.19 0.014 355);
+    --sidebar-foreground: oklch(0.965 0.005 355);
+    --sidebar-primary: oklch(0.79 0.085 5);
+    --sidebar-primary-foreground: oklch(0.21 0.045 5);
+    --sidebar-accent: oklch(0.29 0.05 5);
+    --sidebar-accent-foreground: oklch(0.89 0.05 5);
     --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.704 0.14 182.503);
+    --sidebar-ring: oklch(0.70 0.12 5);
+    /* Shadows barely show on a dark ground: elevation comes from the lighter
+       surface, the border and a faint highlight on the top edge. */
+    --elevation-xs: 0 1px 2px oklch(0 0 0 / 0.35);
+    --elevation-sm: inset 0 1px 0 oklch(1 0 0 / 0.04), 0 1px 3px oklch(0 0 0 / 0.40);
+    --elevation-md: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 6px 16px -4px oklch(0 0 0 / 0.50);
+    --elevation-lg: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 16px 32px -8px oklch(0 0 0 / 0.60);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   html {
     @apply font-sans;
     color-scheme: light;
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 45%, transparent) transparent;
   }
   html.dark {
     color-scheme: dark;
   }
   body {
     @apply bg-background text-foreground antialiased;
+    accent-color: var(--primary);
+    caret-color: var(--primary);
   }
-  /* D55: focus always visible, also on links and elements without their own ring. */
-  :where(a, summary, [tabindex]):focus-visible {
-    @apply rounded-sm outline-2 outline-offset-2 outline-ring;
+  /* D59: titles in Bricolage, never tighter than -0.02em. */
+  h1,
+  h2 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  a {
+    text-underline-offset: 0.2em;
+  }
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+  :where(a, summary):focus-visible {
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* D61: a solid 2px ring with a 2px offset on every focused element. Outside
+   the cascade layers on purpose, so it wins over the `outline-none` of the
+   shadcn components; their 50% halo stays as decoration. The offset puts the
+   ring against the page background, not against the wine of the button. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Radix focuses the dialog container itself (tabindex="-1") when it opens; it
+   is not a control, so it gets no ring around the whole drawer. */
+[role='dialog'][tabindex='-1']:focus-visible {
+  outline: none;
+}
+
+/* D60: reduced motion turns animations and transitions into instant changes. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
