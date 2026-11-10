@@ -11,10 +11,10 @@ export function PublicLayout() {
     <div className="flex min-h-svh flex-col">
       <SkipLink />
       <header className="border-b">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4">
+        <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
           <Brand />
           <nav aria-label="Principal">
-            <Button asChild variant="ghost">
+            <Button asChild variant="ghost" className="h-11 px-4 text-[0.9375rem]">
               <Link to="/entrar">Entrar</Link>
             </Button>
           </nav>
@@ -24,8 +24,9 @@ export function PublicLayout() {
         <Outlet />
       </main>
       <footer className="border-t">
-        <div className="mx-auto w-full max-w-5xl px-4 py-6 text-sm text-muted-foreground">
-          Agenda Inteligente · projeto de portfólio full stack.
+        <div className="mx-auto w-full max-w-5xl px-4 py-8 text-sm text-muted-foreground sm:px-6">
+          Agenda Inteligente é um projeto de portfólio full stack, feito com FastAPI, PostgreSQL,
+          React e TypeScript.
         </div>
       </footer>
     </div>

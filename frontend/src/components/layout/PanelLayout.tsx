@@ -1,15 +1,18 @@
 import {
+  ArrowLeftIcon,
   CalendarDaysIcon,
   ClockIcon,
-  ExternalLinkIcon,
+  MenuIcon,
   ScissorsIcon,
   SettingsIcon,
   UsersIcon,
   CalendarOffIcon,
   type LucideIcon,
 } from 'lucide-react'
+import { useEffect, useRef } from 'react'
 import { Link, Outlet, useMatch, useResolvedPath } from 'react-router'
 
+import { Button } from '@/components/ui/button'
 import {
   Sidebar,
   SidebarContent,
@@ -23,7 +26,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
 
@@ -55,7 +57,7 @@ function PanelNavItem({ item }: { item: NavItem }) {
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={active}>
+      <SidebarMenuButton asChild isActive={active} className="h-11 md:h-8">
         <Link
           to={item.to}
           aria-current={active ? 'page' : undefined}
@@ -66,6 +68,56 @@ function PanelNavItem({ item }: { item: NavItem }) {
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
+  )
+}
+
+/**
+ * Opens the drawer below 768 px: 44 px, with a visible label (D55).
+ *
+ * The drawer is the Sheet of the shadcn sidebar. Radix only gives the focus
+ * back to a `SheetTrigger`, and the sidebar opens it with a plain button, so
+ * on close (Esc, tap outside or a menu item) the focus would fall on `<body>`.
+ * The button takes it back when `openMobile` goes from open to closed, as
+ * soon as Radix removes the `aria-hidden` it puts on the rest of the page
+ * while the drawer leaves; focusing inside it earlier would be blocked.
+ */
+function MobileMenuButton() {
+  const { openMobile, toggleSidebar } = useSidebar()
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const wasOpen = useRef(openMobile)
+
+  useEffect(() => {
+    const closed = wasOpen.current && !openMobile
+    wasOpen.current = openMobile
+    if (!closed) return
+
+    let frame = 0
+    const deadline = performance.now() + 2000
+    const giveFocusBack = () => {
+      const button = buttonRef.current
+      if (button === null) return
+      if (button.closest('[aria-hidden="true"]') !== null && performance.now() < deadline) {
+        frame = requestAnimationFrame(giveFocusBack)
+        return
+      }
+      button.focus()
+    }
+    frame = requestAnimationFrame(giveFocusBack)
+    return () => cancelAnimationFrame(frame)
+  }, [openMobile])
+
+  return (
+    <Button
+      ref={buttonRef}
+      type="button"
+      variant="ghost"
+      className="-ml-2 h-11 gap-2 px-3 text-[0.9375rem]"
+      aria-expanded={openMobile}
+      onClick={toggleSidebar}
+    >
+      <MenuIcon aria-hidden="true" className="size-5" />
+      Menu
+    </Button>
   )
 }
 
@@ -103,9 +155,9 @@ export function PanelLayout() {
         <SidebarFooter>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild>
+              <SidebarMenuButton asChild className="h-11 md:h-8">
                 <Link to="/">
-                  <ExternalLinkIcon aria-hidden="true" />
+                  <ArrowLeftIcon aria-hidden="true" />
                   <span>Voltar ao site</span>
                 </Link>
               </SidebarMenuButton>
@@ -114,9 +166,9 @@ export function PanelLayout() {
         </SidebarFooter>
       </Sidebar>
       <SidebarInset id="conteudo">
-        <header className="flex h-14 items-center gap-2 border-b px-4 md:hidden">
-          <SidebarTrigger className="-ml-1 size-9" />
-          <span className="font-semibold tracking-tight">Painel</span>
+        <header className="flex h-14 items-center justify-between gap-2 border-b px-4 md:hidden">
+          <MobileMenuButton />
+          <span className="font-heading font-semibold tracking-tight">Painel</span>
         </header>
         <div className="flex flex-1 flex-col">
           <Outlet />

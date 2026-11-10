@@ -21,7 +21,7 @@ describe('router (D54)', () => {
     renderAt(PATHS.home)
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: /agendamento online/i }),
+      await screen.findByRole('heading', { level: 1, name: /seus clientes marcam sozinhos/i }),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ver a demo/i })).toHaveAttribute(
       'href',
@@ -37,7 +37,7 @@ describe('router (D54)', () => {
     renderAt('/nao-existe/de-jeito-nenhum')
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Página não encontrada' }),
+      await screen.findByRole('heading', { level: 1, name: 'Esta página não está na agenda' }),
     ).toBeInTheDocument()
   })
 
