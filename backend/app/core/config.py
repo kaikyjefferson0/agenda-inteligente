@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     # Comma-separated. Kept as a string because pydantic-settings would otherwise
     # expect JSON from the environment.
     cors_allowed_origins: str = ""
-    frontend_base_url: str = "http://localhost:5173"
+    frontend_base_url: str = "http://localhost:5174"
     # Header set by the hosting proxy. Empty means no trusted proxy: the address
     # of the connection is used and client-supplied headers are ignored.
     trusted_client_ip_header: str = ""

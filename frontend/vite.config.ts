@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: true,
-      port: 5173,
+      port: 5174,
       strictPort: true,
       watch: {
         // File events from a Windows bind mount do not reach the container.
