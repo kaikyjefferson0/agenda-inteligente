@@ -31,10 +31,10 @@ A API não sobe se `JWT_SECRET` ou `RATE_LIMIT_KEY_SECRET` tiverem menos de 32 c
 
 | Serviço | Endereço |
 |---|---|
-| Frontend | <http://localhost:5173> |
-| API | <http://localhost:8000> |
-| Documentação da API | <http://localhost:8000/docs> |
-| Verificação da API e do banco | <http://localhost:8000/health> |
+| Frontend | <http://localhost:5174> |
+| API | <http://localhost:8002> |
+| Documentação da API | <http://localhost:8002/docs> |
+| Verificação da API e do banco | <http://localhost:8002/health> |
 | PostgreSQL | `localhost:5433` |
 | E-mails enviados (Mailpit) | <http://localhost:8025> |
 
@@ -71,7 +71,7 @@ Com as migrações aplicadas, crie ou restaure o negócio de demonstração:
 docker compose run --rm api python -m app.jobs.restore_demo
 ```
 
-A tarefa apaga e recria apenas o negócio demo, com agendamentos nos 7 dias anteriores e nos próximos, e pode ser repetida. Ela exige `DEMO_PASSWORD` no `.env`, de 12 a 128 caracteres; se o seu `.env` for anterior à demo, copie a linha do `.env.example`. Ao terminar, a página pública fica em <http://localhost:8000/api/v1/public/businesses/barbearia-demo>, e as duas contas entram com essa senha:
+A tarefa apaga e recria apenas o negócio demo, com agendamentos nos 7 dias anteriores e nos próximos, e pode ser repetida. Ela exige `DEMO_PASSWORD` no `.env`, de 12 a 128 caracteres; se o seu `.env` for anterior à demo, copie a linha do `.env.example`. Ao terminar, a página pública fica em <http://localhost:8002/api/v1/public/businesses/barbearia-demo>, e as duas contas entram com essa senha:
 
 | Conta | Perfil |
 |---|---|
@@ -115,7 +115,7 @@ docker compose exec -T api python -m app.scripts.export_openapi - > frontend/src
 docker compose exec frontend npm run api:types
 ```
 
-Os dois arquivos do contrato, `frontend/src/api/openapi.json` e `frontend/src/api/schema.d.ts`, são versionados, e o CI falha se algum estiver desatualizado. Em desenvolvimento, o Vite repassa `/api` para a API, então as chamadas do frontend saem da mesma origem, `http://localhost:5173/api/v1/...`.
+Os dois arquivos do contrato, `frontend/src/api/openapi.json` e `frontend/src/api/schema.d.ts`, são versionados, e o CI falha se algum estiver desatualizado. Em desenvolvimento, o Vite repassa `/api` para a API, então as chamadas do frontend saem da mesma origem, `http://localhost:5174/api/v1/...`.
 
 O `coverage report` usa os dados gravados pelo `pytest --cov`, então rode-o depois dele.
 

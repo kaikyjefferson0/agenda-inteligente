@@ -24,7 +24,8 @@ services:
       # File events from a Windows bind mount do not reach the container.
       WATCHFILES_FORCE_POLLING: "true"
     ports:
-      - "8000:8000"
+      # 8002 on the host leaves 8000 and 8001 free for other local projects.
+      - "8002:8000"
     volumes:
       - ./backend:/app
     depends_on:
@@ -58,7 +59,7 @@ services:
       # D52: Vite forwards /api to the API, so both stay on the same origin.
       VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://api:8000}
     ports:
-      - "5173:5173"
+      - "5174:5174"
     volumes:
       - ./frontend:/app
       # Keeps the Linux dependencies from the image instead of the host's.
