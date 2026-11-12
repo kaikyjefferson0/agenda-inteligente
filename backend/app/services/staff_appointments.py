@@ -11,14 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.security import generate_opaque_token, hash_opaque_token
-from app.domain.availability import overlaps_any
-from app.domain.errors import AppError, ErrorCode
+from app.domain.errors import AppError, ErrorCode, SlotRefusal
 from app.domain.staff_appointments import (
     agenda_period_error,
     block_end,
-    fits_staff_hours,
+    busy_refusal,
     outcome_refusal,
     staff_change_refusal,
+    staff_hours_refusal,
 )
 from app.email.templates import EmailTemplate
 from app.models import (
@@ -150,42 +150,59 @@ async def _require_free(
     """RN19: working hours, conflicts and blocks, as in the availability.
 
     Returns the end of the block. `excluding` is the appointment being
-    rescheduled, which may overlap its own current time (D30).
+    rescheduled, which may overlap its own current time (D30). A refusal tells
+    its reason, in the order of D77.
     """
     blocked_until = block_end(starts_at, duration_minutes, preparation_minutes)
+    if blocked_until is None:  # Past the end of the calendar: no hours reach it.
+        raise _unavailable(SlotRefusal.OUTSIDE_WORKING_HOURS)
     intervals = await working_hours.list_for_professional(
         session, business.id, professional_id
     )
-    if blocked_until is None or not fits_staff_hours(
+    refusal = staff_hours_refusal(
         starts_at, blocked_until, intervals, ZoneInfo(business.timezone), now
-    ):
-        raise AppError(ErrorCode.SLOT_UNAVAILABLE)
-    booked = await appointments.busy_periods(
-        session,
-        business.id,
-        [professional_id],
-        starts_at,
-        blocked_until,
-        excluding=excluding,
     )
-    blocked = await time_blocks.busy_periods(
-        session, business.id, [professional_id], starts_at, blocked_until
-    )
-    busy = [*booked.get(professional_id, []), *blocked.get(professional_id, [])]
-    if overlaps_any(starts_at, blocked_until, busy):
-        raise AppError(ErrorCode.SLOT_UNAVAILABLE)
+    if refusal is None:
+        blocked = await time_blocks.busy_periods(
+            session, business.id, [professional_id], starts_at, blocked_until
+        )
+        booked = await appointments.busy_periods(
+            session,
+            business.id,
+            [professional_id],
+            starts_at,
+            blocked_until,
+            excluding=excluding,
+        )
+        refusal = busy_refusal(
+            starts_at,
+            blocked_until,
+            time_blocks=blocked.get(professional_id, []),
+            appointments=booked.get(professional_id, []),
+        )
+    if refusal is not None:
+        raise _unavailable(refusal)
     return blocked_until
+
+
+def _unavailable(reason: SlotRefusal) -> AppError:
+    """D77: the team's routes always tell why the time was refused."""
+    return AppError(ErrorCode.SLOT_UNAVAILABLE, reason=reason)
 
 
 async def _flush_or_unavailable(session: AsyncSession) -> None:
     """RN14: the exclusion constraint is the last defense, and the rollback
-    discards the change, so a refused reschedule keeps the original time."""
+    discards the change, so a refused reschedule keeps the original time.
+
+    The constraint is the one between appointments; time blocks are kept apart
+    by the lock on the professional, so a violation here is always another
+    appointment that got in first."""
     try:
         await session.flush()
     except IntegrityError as exc:
         await session.rollback()
         if getattr(exc.orig, "sqlstate", None) == EXCLUSION_VIOLATION:
-            raise AppError(ErrorCode.SLOT_UNAVAILABLE) from exc
+            raise _unavailable(SlotRefusal.APPOINTMENT_CONFLICT) from exc
         raise
 
 
@@ -410,7 +427,8 @@ async def reschedule(
         # A simultaneous change moved it to a professional this one did not lock.
         # Locking them now would take a professional after the appointment and
         # break the lock order, so the request is refused and nothing changes.
-        raise AppError(ErrorCode.SLOT_UNAVAILABLE)
+        # The time was never checked, so the reason is the change itself (D77).
+        raise _unavailable(SlotRefusal.CHANGED_MEANWHILE)
     await _require_bookable(session, business_id, service, target_id)
     blocked_until = await _require_free(
         session,

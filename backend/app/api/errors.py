@@ -9,7 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 
-from app.domain.errors import AppError, ErrorCode
+from app.domain.errors import AppError, ErrorCode, SlotRefusal
 from app.schemas.schedule import AppointmentData
 
 logger = logging.getLogger(__name__)
@@ -99,6 +99,25 @@ PROBLEMS: dict[ErrorCode, Problem] = {
 }
 
 
+# D77: the detail of SLOT_UNAVAILABLE on the team's routes, one per reason.
+# The public routes keep the generic detail above, without a reason.
+SLOT_REFUSAL_DETAILS: dict[SlotRefusal, str] = {
+    SlotRefusal.CHANGED_MEANWHILE: (
+        "O agendamento foi alterado por outra pessoa durante a remarcação. "
+        "Atualize a agenda e tente de novo."
+    ),
+    SlotRefusal.IN_PAST: "Este horário já passou.",
+    SlotRefusal.OUTSIDE_WORKING_HOURS: (
+        "O atendimento, com o preparo, não cabe em um intervalo do expediente "
+        "do profissional."
+    ),
+    SlotRefusal.BLOCKED: "Este horário cai em um bloqueio do profissional.",
+    SlotRefusal.APPOINTMENT_CONFLICT: (
+        "Este horário coincide com outro agendamento do profissional."
+    ),
+}
+
+
 def _problem_body(
     code: ErrorCode, status: int, title: str, detail: str
 ) -> dict[str, Any]:
@@ -130,6 +149,9 @@ def problem_response(
 
 def _app_error_extra(error: AppError) -> dict[str, Any]:
     extra: dict[str, Any] = {}
+    if error.reason is not None:
+        extra["reason"] = error.reason.value
+        extra["detail"] = SLOT_REFUSAL_DETAILS[error.reason]
     if error.conflicts is not None:
         extra["conflicts"] = [
             AppointmentData.model_validate(appointment).model_dump(mode="json")

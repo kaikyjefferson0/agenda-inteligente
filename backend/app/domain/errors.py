@@ -28,6 +28,23 @@ class ErrorCode(StrEnum):
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
+class SlotRefusal(StrEnum):
+    """D77: why the team's routes refuse a time with `SLOT_UNAVAILABLE`.
+
+    When more than one applies, the first in this order is the one told.
+    `CHANGED_MEANWHILE` comes first: it is decided before the time is checked.
+    The public routes never tell it, so the customer cannot read the agenda.
+    """
+
+    # A reschedule whose appointment another change moved to a professional it
+    # did not lock, while it waited for the locks. The time was never checked.
+    CHANGED_MEANWHILE = "changed_meanwhile"
+    IN_PAST = "in_past"
+    OUTSIDE_WORKING_HOURS = "outside_working_hours"
+    BLOCKED = "blocked"
+    APPOINTMENT_CONFLICT = "appointment_conflict"
+
+
 class AppError(Exception):
     """A business failure. The API layer translates it to HTTP."""
 
@@ -39,6 +56,7 @@ class AppError(Exception):
         conflicts: Sequence[AppointmentSummary] | None = None,
         invalid_field: tuple[str, str] | None = None,
         invalid_location: str = "body",
+        reason: SlotRefusal | None = None,
     ) -> None:
         super().__init__(code.value)
         self.code = code
@@ -47,3 +65,5 @@ class AppError(Exception):
         # (field, message), for a rule that needs the stored values to be checked.
         self.invalid_field = invalid_field
         self.invalid_location = invalid_location
+        # D77: only the team's routes set it, and only with SLOT_UNAVAILABLE.
+        self.reason = reason

@@ -1128,6 +1128,16 @@
               }
             }
           },
+          "409": {
+            "description": "SLOT_UNAVAILABLE, com o motivo em `reason`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffConflictProblem"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -1182,6 +1192,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StaffChangeResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "SLOT_UNAVAILABLE, com o motivo em `reason`, ou INVALID_STATUS_TRANSITION",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffConflictProblem"
                 }
               }
             }
@@ -3059,6 +3079,18 @@
         ],
         "title": "SlotData"
       },
+      "SlotRefusal": {
+        "type": "string",
+        "enum": [
+          "changed_meanwhile",
+          "in_past",
+          "outside_working_hours",
+          "blocked",
+          "appointment_conflict"
+        ],
+        "title": "SlotRefusal",
+        "description": "D77: why the team's routes refuse a time with `SLOT_UNAVAILABLE`.\n\nWhen more than one applies, the first in this order is the one told.\n`CHANGED_MEANWHILE` comes first: it is decided before the time is checked.\nThe public routes never tell it, so the customer cannot read the agenda."
+      },
       "StaffAppointmentData": {
         "properties": {
           "id": {
@@ -3305,6 +3337,56 @@
           "email_status"
         ],
         "title": "StaffChangeResponse"
+      },
+      "StaffConflictProblem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "integer",
+            "const": 409,
+            "title": "Status"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "SLOT_UNAVAILABLE",
+              "INVALID_STATUS_TRANSITION"
+            ],
+            "title": "Code"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SlotRefusal"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Só em SLOT_UNAVAILABLE. Se mais de um valer, vem o primeiro desta ordem: changed_meanwhile (só na remarcação), in_past, outside_working_hours, blocked, appointment_conflict"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail"
+        ],
+        "title": "StaffConflictProblem",
+        "description": "The 409 of the team's routes, as `application/problem+json`.\n\nD77: `SLOT_UNAVAILABLE` always brings `reason`, and `detail` tells it in\nPortuguese. The public routes answer the same code without `reason`."
       },
       "StaffCustomerData": {
         "properties": {

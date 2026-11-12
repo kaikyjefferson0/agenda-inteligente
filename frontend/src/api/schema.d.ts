@@ -1197,6 +1197,16 @@ export interface components {
             starts_at: string;
         };
         /**
+         * SlotRefusal
+         * @description D77: why the team's routes refuse a time with `SLOT_UNAVAILABLE`.
+         *
+         *     When more than one applies, the first in this order is the one told.
+         *     `CHANGED_MEANWHILE` comes first: it is decided before the time is checked.
+         *     The public routes never tell it, so the customer cannot read the agenda.
+         * @enum {string}
+         */
+        SlotRefusal: "changed_meanwhile" | "in_past" | "outside_working_hours" | "blocked" | "appointment_conflict";
+        /**
          * StaffAppointmentData
          * @description D26: what the team sees in the agenda, with the instants in UTC.
          */
@@ -1329,6 +1339,33 @@ export interface components {
              * @enum {string}
              */
             email_status: "queued" | "skipped" | "none";
+        };
+        /**
+         * StaffConflictProblem
+         * @description The 409 of the team's routes, as `application/problem+json`.
+         *
+         *     D77: `SLOT_UNAVAILABLE` always brings `reason`, and `detail` tells it in
+         *     Portuguese. The public routes answer the same code without `reason`.
+         */
+        StaffConflictProblem: {
+            /** Type */
+            type: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: 409;
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "SLOT_UNAVAILABLE" | "INVALID_STATUS_TRANSITION";
+            /** Detail */
+            detail: string;
+            /** @description Só em SLOT_UNAVAILABLE. Se mais de um valer, vem o primeiro desta ordem: changed_meanwhile (só na remarcação), in_past, outside_working_hours, blocked, appointment_conflict */
+            reason?: components["schemas"]["SlotRefusal"] | null;
         };
         /**
          * StaffCustomerData
@@ -2255,6 +2292,15 @@ export interface operations {
                     "application/json": components["schemas"]["CreatedAppointmentResponse"];
                 };
             };
+            /** @description SLOT_UNAVAILABLE, com o motivo em `reason` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffConflictProblem"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -2288,6 +2334,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StaffChangeResponse"];
+                };
+            };
+            /** @description SLOT_UNAVAILABLE, com o motivo em `reason`, ou INVALID_STATUS_TRANSITION */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StaffConflictProblem"];
                 };
             };
             /** @description Validation Error */
