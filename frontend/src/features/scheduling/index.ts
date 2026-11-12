@@ -14,4 +14,3 @@ export {
   type PublicProfessional,
   type PublicService,
 } from './queries'
-export { secondsLeft, useRetryAfter } from './use-retry-after'

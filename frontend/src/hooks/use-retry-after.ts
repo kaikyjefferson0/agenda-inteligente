@@ -7,9 +7,15 @@ export function secondsLeft(until: number | null, now = Date.now()): number {
   return until === null ? 0 : Math.max(0, Math.ceil((until - now) / 1000))
 }
 
+/** Text of a held button: seconds below one minute, minutes (rounded up) above it. */
+export function waitLabel(seconds: number): string {
+  return seconds < 60 ? `Aguarde ${seconds} s` : `Aguarde ${Math.ceil(seconds / 60)} min`
+}
+
 /**
  * `429` with `Retry-After`: counts down the wait, so the action stays held
- * (and its button says "Aguarde N s") until it ends.
+ * (and its button says "Aguarde N s") until it ends. Shared by the features
+ * (D66, D76), so it lives outside any of them.
  */
 export function useRetryAfter() {
   const [until, setUntil] = useState<number | null>(null)
@@ -37,5 +43,5 @@ export function useRetryAfter() {
   /** Read on submit, before React redraws the button. */
   const holding = useCallback(() => secondsLeft(until) > 0, [until])
 
-  return { wait, waiting: wait > 0, holdFor, holding }
+  return { wait, waiting: wait > 0, label: waitLabel(wait), holdFor, holding }
 }

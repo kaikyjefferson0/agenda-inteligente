@@ -18,8 +18,9 @@ frontend/src/
 ├── features/
 │   ├── scheduling/          # Compartilhado (D66): negócio, disponibilidade, dia e horário
 │   ├── booking/             # Agendamento público (UC10 e UC11): passos, formulário e sucesso
-│   └── customer-appointment/# Link do cliente (UC12 a UC14): consulta, cancelamento e remarcação
-├── hooks/        # Hooks compartilhados, como o use-mobile do sidebar
+│   ├── customer-appointment/# Link do cliente (UC12 a UC14): consulta, cancelamento e remarcação
+│   └── auth/                # Sessão entre abas e telas de conta (UC02 a UC04, D70 a D76)
+├── hooks/        # Hooks compartilhados: use-mobile do sidebar e use-retry-after (D76)
 ├── lib/          # Funções puras: datas e fusos, esquema de cores, prévia da demo e utilitários
 ├── pages/        # Páginas por grupo de rotas: public/, account/, panel/ e a 404
 └── test/         # Configuração do Vitest e servidor do MSW com os handlers
@@ -42,7 +43,8 @@ Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam a
 | `/painel/servicos`, `/equipe`, `/expediente`, `/bloqueios`, `/negocio` | Configuração | Painel |
 | Qualquer outra | Página não encontrada | Principal |
 
-- `/`, `/n/:slug`, `/agendamento/:token` e a 404 são definitivas. As demais são provisórias, com o título e uma frase do que virá.
+- `/`, `/n/:slug`, `/agendamento/:token`, as quatro rotas de conta e a 404 são definitivas. As páginas do painel são provisórias, com o título e uma frase do que virá, mas já exigem sessão (D73) e respeitam o papel (D74).
+- O cadastro de negócio (UC01, `POST /auth/register`) não tem rota no frontend: fica desligado na demo pública (RN27). A sugestão de `/cadastro` está nos [Pontos a revisar](README.md#pontos-a-revisar).
 - Cada grupo (público, conta e painel) é um módulo importado com `lazy`, que o Vite separa em um arquivo próprio. O layout público e a 404 ficam no arquivo principal.
 - Cada grupo tem um `errorElement` (`RouteError`), então um erro no painel não derruba as páginas públicas. Uma falha ao baixar o módulo, comum logo depois de um deploy, se resolve recarregando a página.
 - As páginas abertas por um link com token (`/agendamento`, `/convite` e `/recuperar-senha`) declaram `<meta name="referrer" content="no-referrer">`, para o token não sair no cabeçalho `Referer`.
@@ -84,11 +86,45 @@ As mensagens de `fieldErrors` vêm do Pydantic, em inglês; os formulários most
 
 O `QueryClient` (`src/api/query-client.ts`) repete uma leitura só depois de `NetworkError` ou `5xx`, no máximo 2 vezes. Um `4xx`, inclusive o `429`, é uma resposta final. Mutações nunca são repetidas, porque podem ter chegado à API. As leituras também não são refeitas ao voltar para a aba e ficam válidas por 30 segundos.
 
-### Sessão
+### Token no cliente
 
-O cliente já aceita um provedor de token de acesso, `setAccessTokenProvider(() => token | null)`, e envia `Authorization: Bearer` quando há token. Ele envia `X-Requested-With` apenas em `/auth/refresh` e `/auth/logout`, as rotas com cookie que exigem o cabeçalho contra CSRF. A etapa de login só pluga a sessão.
+A sessão se pluga em `setAccessTokenProvider`, que pode devolver uma `Promise`, e em `setUnauthorizedHandler` (D72). O cliente só pede o token para rotas autenticadas: as públicas e as de conta, exceto `/auth/me`, nunca levam `Authorization`. Ele envia `X-Requested-With` apenas em `/auth/refresh` e `/auth/logout`, as rotas com cookie que exigem o cabeçalho contra CSRF. Um `401` numa requisição que levou token causa uma renovação e uma nova tentativa da mesma requisição.
 
-**A renovação de sessão precisa ser única entre abas.** O refresh tem rotação sem tolerância: duas chamadas simultâneas com o mesmo cookie, como ao recarregar duas abas, são tratadas como reuso e encerram a sessão. A etapa de login deve serializar `/auth/refresh` entre abas, por exemplo com a Web Locks API, e reler o resultado obtido pela aba que renovou ([Arquitetura](08-arquitetura.md#frontend), UC02).
+**A renovação de sessão precisa ser única entre abas.** O refresh tem rotação sem tolerância: duas chamadas simultâneas com o mesmo cookie, como ao recarregar duas abas, são tratadas como reuso e encerram a sessão ([Arquitetura](08-arquitetura.md#frontend), UC02). A solução está em [Sessão](#sessão-d70-a-d73).
+
+### Sessão (D70 a D73)
+
+O código fica em `src/features/auth/session`. O token de acesso só existe em memória; o `localStorage` guarda apenas a indicação `agenda-inteligente:tem-sessao` (D71).
+
+```mermaid
+sequenceDiagram
+    participant A as Aba A
+    participant L as Lock (Web Locks)
+    participant B as Aba B
+    participant API
+    A->>L: pede o lock
+    B->>L: pede o lock (espera)
+    L-->>A: concedido
+    A->>B: "alguém tem token?" (BroadcastChannel)
+    Note over A: ninguém responde em 150 ms
+    A->>API: POST /auth/refresh
+    API-->>A: novo token + cookie novo
+    A->>B: sessão nova (BroadcastChannel)
+    A->>L: solta o lock
+    L-->>B: concedido
+    Note over B: já recebeu uma sessão emitida depois do pedido: usa e não chama o refresh
+```
+
+- **Ao abrir o site:** `main.tsx` chama `getAppSession().start()` uma vez. Sem a indicação, a sessão é anônima sem nenhuma requisição. Com ela, a aba renova pelo fluxo acima; se outra aba já tem token, recebe-o sem gastar rotação.
+- **Renovação:** dentro do lock `agenda-inteligente:refresh`. Antes de chamar `/auth/refresh`, a aba relê o que chegou pelo canal `agenda-inteligente:sessao` enquanto esperava e pergunta às outras se alguém tem token com mais de 1 minuto de validade. Quem renova manda o resultado antes de soltar o lock. Chamadas simultâneas da mesma aba compartilham uma promessa.
+- **Quando renova:** quando falta menos de 1 minuto e uma requisição precisa do token (o provedor do cliente é assíncrono), e uma vez depois de um `401` (D72). Não há timer, então uma aba parada não gasta rotações.
+- **Login:** avisa as outras abas, que adotam o token; uma aba em `/entrar` segue para o painel. O cache do TanStack Query é limpo, porque o usuário pode ser outro.
+- **Saída:** `/auth/logout` dentro do lock; depois, todas as abas limpam a sessão e o cache e vão para `/entrar`. A sessão local termina mesmo se o logout falhar na rede. A redefinição de senha (`204`) também encerra a sessão em todas as abas, porque a API revoga todas.
+- **Refresh recusado (`401`):** a sessão termina em todas as abas, e `/entrar` explica que ela terminou. Falha de rede ou `5xx` mantêm a sessão e a indicação.
+- **Sem Web Locks** (contexto inseguro, como `http://192.168.x.x`): só as chamadas da mesma aba ficam em série. Em `localhost` e em HTTPS o lock existe.
+- **Rotas protegidas (D73):** o loader do grupo do painel espera o `start()` e, sem sessão, leva a `/entrar?voltar=<caminho>`. `?voltar=` só aceita caminhos de `/painel`.
+- **Papéis (D74):** o menu do Profissional mostra Agenda, Expediente e Bloqueios; Serviços, Equipe e Negócio são do Dono (`RequireOwner`), e um Profissional que abre uma delas volta para `/painel`. É conforto; a segurança é a do backend.
+- **Conferido no Chrome** com duas abas do mesmo perfil: abrir a segunda aba não chama o refresh, e recarregar as duas no mesmo instante produz um único `POST /auth/refresh`, visto no Network e no log da API.
 
 ## Identidade visual (D55, D59 a D62)
 
@@ -160,6 +196,36 @@ Contraste medido na página renderizada, com o chrome-devtools:
 - **Marca** (`Brand`): glifo próprio em SVG, com três fichas de horário e a do meio escolhida.
 - **Página inicial:** texto para o dono do negócio. A prévia da hero é uma ilustração estática numa moldura de celular, escondida dos leitores de tela; os horários não têm borda, hover nem cursor de clique. A data mostrada é o próximo dia de expediente da demo, a partir de hoje no fuso do negócio (`src/lib/demo-preview.ts`). "Como funciona" mostra três passos, cada um com um recorte da interface em vez de ícone.
 
+## Conta e sessão (UC02 a UC04)
+
+O código fica em `src/features/auth`; as páginas de `src/pages/account` só escolhem a tela, e `src/pages/panel` monta o `PanelLayout` com a conta e o "Sair".
+
+| Arquivo | Conteúdo |
+|---|---|
+| `session/session.ts` | Gerenciador da sessão, sem React: estado, `start`, `getAccessToken`, `handleUnauthorized`, `login`, `logout` e `end` (D70 a D72) |
+| `session/tab-sync.ts` | Lock (Web Locks, com alternativa local) e canal (`BroadcastChannel`, com alternativa muda) |
+| `session/session-hint.ts` | A indicação no `localStorage` (D71) |
+| `use-session.ts` | `useSession()`, com `useSyncExternalStore` |
+| `queries.ts` | `meQuery` (`['auth', 'me']`) e as mutações de login, saída, recuperação, redefinição e convite |
+| `schemas.ts` | Esquemas zod com textos em português; a senha nova segue a RN30, contada em caracteres como a API |
+| `return-to.ts` | `?voltar=` seguro (D73) |
+| `demo.ts` | Contas da demo e `VITE_DEMO_PASSWORD` (D75) |
+| `guard.ts` | Loader do painel |
+| `use-panel-account.ts` | Usuário, papel e "Sair" para o painel, e a saída quando a sessão termina |
+| `components/` | Moldura das telas de conta, campo de senha, login, demonstração, recuperação, nova senha e `RequireOwner` |
+
+### Telas
+
+- **Moldura:** uma coluna estreita, com o título em Bricolage. A partir de 640 px, o formulário fica num card; no celular, direto na página. Campos e botões com 44 px.
+- **Senha:** campo do `input-group` do shadcn com o botão "Mostrar"/"Ocultar", com texto visível e 44 px de toque (um `::after` cobre a borda do grupo). Colar e o gerenciador de senhas funcionam (`autocomplete` `current-password` ou `new-password`). O contorno de foco (D61) envolve o grupo inteiro.
+- **`/entrar`:** e-mail e senha. Credenciais erradas mostram "E-mail ou senha incorretos." sem dizer qual campo errou, limpam a senha e devolvem o foco a ela. Abaixo, "Conhecer pela demonstração" entra como Dono ou como Profissional (D75). Uma sessão encerrada por expiração ou por redefinição de senha mostra o motivo.
+- **`/esqueci-senha`:** a confirmação é a mesma para qualquer e-mail (RN24) e mostra o endereço digitado, a validade de uma hora e o "Usar outro e-mail", que devolve o foco ao campo. Um e-mail `@demo.example.com` recebe o aviso da RN28 sem chamar a API.
+- **`/recuperar-senha/:token` e `/convite/:token`:** o mesmo formulário, com a RN30 (de 12 a 128 caracteres, sem regras de composição), contador de caracteres e dica. O token vai no corpo e nunca no `Referer` (`no-referrer`). Sucesso e link inválido (`400 INVALID_TOKEN`, ou `422` no `token`) trocam o formulário por um painel com o foco no título.
+- **`429`:** em todas as telas, a mensagem diz quanto esperar, e o botão fica em "Aguarde N s" ou "Aguarde N min" (D76).
+- **Painel:** no rodapé do menu e da gaveta, o nome do usuário, o papel e o negócio, o "Sair" e o "Voltar ao site"; no celular, o cabeçalho mostra o nome do negócio.
+
+**Limitação conhecida:** sem `VITE_DEMO_PASSWORD`, o atalho da demonstração some. Uma rota `POST /auth/demo` no backend tiraria a senha do JavaScript público ([Pontos a revisar](README.md#pontos-a-revisar)).
+
 ## Agendamento público (UC10 e UC11)
 
 `/n/:slug` mostra o negócio (`GET /public/businesses/{slug}`) e o fluxo de agendamento. O código fica em `src/features/booking`, mais o compartilhado de `src/features/scheduling` (D66); a página (`src/pages/public/BusinessPage.tsx`) só escolhe entre carregando, não encontrado, erro e o fluxo.
@@ -168,7 +234,6 @@ Contraste medido na página renderizada, com o chrome-devtools:
 |---|---|
 | `scheduling/queries.ts` | `businessQuery` e `availabilityQuery`, com as chaves `['public', 'business', slug, ...]` |
 | `scheduling/professionals.ts` | Profissionais aptos (RN07) e o valor de "qualquer profissional" |
-| `scheduling/use-retry-after.ts` | Espera do `Retry-After` depois de um `429` |
 | `scheduling/components/` | `DateTimePicker`, `ChoiceList` e `ContinueButton` |
 | `queries.ts` | `useCreateBooking` |
 | `use-booking-flow.ts` | Estado do fluxo a partir da URL e do histórico (D65) |
@@ -298,19 +363,21 @@ As funções de `src/lib/datetime.ts` recebem sempre o fuso do negócio e nunca 
 
 ```bash
 npm run test           # Vitest
-npm run test:coverage  # com cobertura; mínimo de 80% em src/lib, src/api e em cada pasta de src/features
+npm run test:coverage  # com cobertura; mínimo de 80% em src/lib, src/api e em cada pasta de src/features, auth inclusive
 npm run typecheck      # tsc -b
 npm run api:types      # regenera src/api/schema.d.ts
 ```
 
 - **Ambiente:** jsdom, com o processo em `TZ=Asia/Tokyo` (definido em `vite.config.ts`), para que qualquer uso do fuso do navegador apareça nos testes. O `setup.ts` substitui `matchMedia` e `ResizeObserver`, que o jsdom não tem. Os testes do agendamento fixam o relógio num instante em que o dia de São Paulo e o de Tóquio são diferentes, com `vi.useFakeTimers({ toFake: ['Date'] })`.
-- **API:** o MSW intercepta as requisições em `http://api.test`, o `VITE_API_BASE_URL` dos testes. Uma requisição sem handler faz o teste falhar. Cada teste troca as respostas com `server.use`.
-- **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; o roteador; preços e durações; o agendamento público (negócio e slug inexistente, horários no fuso do negócio, dia sem horários, teclado, parâmetros inválidos, idempotência com clique duplo e falha de rede, `409`, `429`, `422`, limite de e-mail, repetição sem link e tela de sucesso); e o link do cliente (os quatro status, prazo vencido, serviço desativado, link inválido, foco do diálogo com Esc, cancelamento com clique duplo, recusas definitivas, `429` e falha de rede, profissional e dia iniciais da remarcação, `409`, limite de e-mail e serviço que saiu da página).
+- **API:** o MSW intercepta as requisições em `http://api.test`, o `VITE_API_BASE_URL` dos testes. Uma requisição sem handler faz o teste falhar. Cada teste troca as respostas com `server.use`. `src/test/msw/auth.ts` simula as rotas de `/auth` com estado (cookie, tokens emitidos e contadores por rota).
+- **Sessão:** cada teste começa com uma sessão nova, com lock, canal e indicação em memória. `src/test/session.ts` tem o `memoryBus`, que simula o `BroadcastChannel` entre várias "abas" no mesmo processo, e o `withOpenSession`, que simula um navegador já logado. O `VITE_DEMO_PASSWORD` dos testes é `senha-da-demo-de-teste`.
+- **Foco depois de uma resposta da API:** quando um componente move o foco num `useEffect` (título de sucesso, painel de resultado), a renderização vem da resposta do MSW, fora de `act()`, e o efeito pode rodar depois de o `findBy…` encontrar o elemento. O teste espera o foco com `await waitFor(() => expect(el).toHaveFocus())`, nunca com `expect` direto. O teste de clique duplo do agendamento usava `expect` direto e falhava em cerca de 3 de cada 20 execuções; a correção foi no teste, porque no navegador o efeito roda logo depois da pintura. Foco movido dentro de uma ação do `user-event`, que já roda em `act()`, ou de forma síncrona, como `setFocus` do React Hook Form, pode ser conferido direto.
+- **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; o roteador; preços e durações; o agendamento público (negócio e slug inexistente, horários no fuso do negócio, dia sem horários, teclado, parâmetros inválidos, idempotência com clique duplo e falha de rede, `409`, `429`, `422`, limite de e-mail, repetição sem link e tela de sucesso); a sessão e as telas de conta (renovação silenciosa com e sem a indicação, duas e três abas renovando ao mesmo tempo com um único `/auth/refresh`, aba nova sem refresh, login, logout e fim da sessão chegando às outras abas, `401` com nova tentativa, login com sucesso, erro e `429`, demonstração, rota protegida que redireciona e volta, `?voltar=` malicioso, papéis, RN30 em caracteres e `429` nas telas de senha); e o link do cliente (os quatro status, prazo vencido, serviço desativado, link inválido, foco do diálogo com Esc, cancelamento com clique duplo, recusas definitivas, `429` e falha de rede, profissional e dia iniciais da remarcação, `409`, limite de e-mail e serviço que saiu da página).
 - **CI:** o job do frontend roda ESLint, `typecheck`, `test:coverage`, a conferência da D51 e o build.
 
 ## Uso dos MCPs (D58)
 
 - **shadcn:** consulte os componentes pelo MCP e instale com `npx shadcn add <nome>`. Eles ficam em `src/components/ui` e só mudam para traduzir textos, atender às regras de lint ou alcançar o contraste AA (como a variante `destructive` do botão e do selo). Quando o CLI pede para sobrescrever um componente já ajustado, como o `button.tsx` ao instalar o `alert-dialog`, a resposta é não. O `Slot` do Radix junta as classes sem o `tailwind-merge`, então um tamanho passado a `AlertDialogCancel` precisa do `!`.
-- **Magic:** só em componentes de destaque: a seção principal de `/` e a escolha de dia e horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion. O `DateTimePicker` veio do "Time Slot Picker" (21st.dev, klyv-ui, id 43217), que não tem dependências. Manteve os dois grupos de rádio navegáveis pelo teclado e o fuso sempre impresso. Trocou as datas no fuso do navegador pelas de `src/lib/datetime.ts`, a carga de todos os dias pela de um dia por vez, as cores pelos tokens e os alvos para 44 px, e passou a agrupar os horários por período. O link do cliente reaproveita o mesmo `DateTimePicker` e não tem componente de destaque novo, então não usou o Magic.
+- **Magic:** só em componentes de destaque: a seção principal de `/` e a escolha de dia e horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion. O `DateTimePicker` veio do "Time Slot Picker" (21st.dev, klyv-ui, id 43217), que não tem dependências. Manteve os dois grupos de rádio navegáveis pelo teclado e o fuso sempre impresso. Trocou as datas no fuso do navegador pelas de `src/lib/datetime.ts`, a carga de todos os dias pela de um dia por vez, as cores pelos tokens e os alvos para 44 px, e passou a agrupar os horários por período. O link do cliente reaproveita o mesmo `DateTimePicker` e não tem componente de destaque novo, então não usou o Magic. As telas de conta também não usaram: são formulários de tarefa, e o único ponto de destaque, o acesso à demonstração, é uma lista de dois botões feita com os componentes existentes. O `input-group` (e o `textarea`, que vem com ele) entrou pelo `npx shadcn add`, e o CLI não sobrescreveu `button.tsx` nem `input.tsx`.
 - **chrome-devtools:** cada página nova ou alterada é conferida em 375 px e 1280 px, nos modos claro e escuro, sem rolagem horizontal, sem erros no console, com o contraste dos pares da tabela medido na página e o foco conferido pelo teclado.
 - **Arquivos de design system (D62):** nada de `design-system/`, `PRODUCT.md` ou `DESIGN.md` no repositório. A referência é `src/index.css` mais esta seção.

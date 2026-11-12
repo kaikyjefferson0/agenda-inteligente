@@ -200,6 +200,16 @@
   outline-offset: 2px;
 }
 
+/* An input group (the password with its button) is one control: the ring goes
+   around the whole group, not around the input inside it. */
+[data-slot='input-group-control']:focus-visible {
+  outline: none;
+}
+[data-slot='input-group']:has(> [data-slot='input-group-control']:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 /* Radix focuses the dialog container itself (tabindex="-1") when it opens; it
    is not a control, so it gets no ring around the whole drawer or dialog. */
 [role='dialog'][tabindex='-1']:focus-visible,

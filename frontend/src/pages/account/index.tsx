@@ -1,41 +1,26 @@
 // Account group (D54): loaded on demand as one chunk.
-import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
+import { useParams } from 'react-router'
 
+import { ForgotPasswordScreen, LoginScreen, NewPasswordScreen } from '@/features/auth'
+
+/** `/entrar` (UC02). */
 export function LoginPage() {
-  return (
-    <PlaceholderPage
-      title="Entrar"
-      description="Aqui o Dono e os profissionais vão entrar com e-mail e senha para abrir o painel."
-    />
-  )
+  return <LoginScreen />
 }
 
+/** `/esqueci-senha` (UC03). */
 export function ForgotPasswordPage() {
-  return (
-    <PlaceholderPage
-      title="Esqueci minha senha"
-      description="Aqui será possível pedir, pelo e-mail da conta, um link para definir uma nova senha."
-    />
-  )
+  return <ForgotPasswordScreen />
 }
 
+/** Path of the e-mail sent by `app/services/invitations.py`: `/convite/<token>` (UC04). */
 export function InvitationPage() {
-  return (
-    <PlaceholderPage
-      hasToken
-      title="Aceitar convite"
-      description="Aqui o profissional convidado vai definir a senha e passar a entrar no painel."
-    />
-  )
+  const { token = '' } = useParams()
+  return <NewPasswordScreen mode="invitation" token={token} />
 }
 
-/** Path of the e-mail sent by `app/services/passwords.py`: `/recuperar-senha/<token>`. */
+/** Path of the e-mail sent by `app/services/passwords.py`: `/recuperar-senha/<token>` (UC03). */
 export function ResetPasswordPage() {
-  return (
-    <PlaceholderPage
-      hasToken
-      title="Definir nova senha"
-      description="Aqui será definida a nova senha pelo link recebido por e-mail, que vale por uma hora."
-    />
-  )
+  const { token = '' } = useParams()
+  return <NewPasswordScreen mode="reset" token={token} />
 }

@@ -3,6 +3,7 @@ import { createBrowserRouter, type RouteObject } from 'react-router'
 import { PageLoader } from '@/components/feedback/PageLoader'
 import { RouteError } from '@/components/feedback/RouteError'
 import { PublicLayout } from '@/components/layout/PublicLayout'
+import { requireSession } from '@/features/auth/guard'
 import NotFoundPage from '@/pages/NotFoundPage'
 
 /**
@@ -78,7 +79,11 @@ export const routes: RouteObject[] = [
       {
         id: 'panel',
         path: 'painel',
-        lazy: async () => ({ Component: (await panelPages()).PanelLayout }),
+        // Without a session, the loader sends to `/entrar?voltar=…` (D73).
+        lazy: async () => {
+          const pages = await panelPages()
+          return { loader: requireSession, Component: pages.ProtectedPanelLayout }
+        },
         errorElement: <RouteError />,
         children: [
           {

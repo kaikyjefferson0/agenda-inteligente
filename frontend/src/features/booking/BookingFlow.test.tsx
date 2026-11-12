@@ -346,7 +346,9 @@ describe('customer data and booking (UC11)', () => {
     release()
 
     const heading = await screen.findByRole('heading', { level: 2, name: 'Agendamento confirmado' })
-    expect(heading).toHaveFocus()
+    // The heading takes the focus in a useEffect. The response of the API is
+    // rendered outside act(), so the effect may run after findByRole resolves.
+    await waitFor(() => expect(heading).toHaveFocus())
     expect(requests).toHaveLength(1)
     expect(requests[0].key).toMatch(UUID)
     expect(requests[0].body).toEqual({

@@ -18,7 +18,8 @@ import {
 } from '../customer-schema'
 import { useIdempotencyKey } from '../idempotency'
 import { useCreateBooking, type Booking, type CreateBookingBody } from '../queries'
-import { ContinueButton, useRetryAfter } from '@/features/scheduling'
+import { ContinueButton } from '@/features/scheduling'
+import { useRetryAfter } from '@/hooks/use-retry-after'
 
 interface CustomerStepProps {
   slug: string
@@ -79,7 +80,7 @@ export function CustomerStep({
   })
   const mutation = useCreateBooking(slug)
   const [failure, setFailure] = useState<unknown>(null)
-  const { wait, waiting, holdFor, holding } = useRetryAfter()
+  const { waiting, label: waitText, holdFor, holding } = useRetryAfter()
   const formRef = useRef<HTMLFormElement>(null)
   // Set synchronously on submit: a double click never sends twice (D64).
   const sending = useRef(false)
@@ -186,7 +187,7 @@ export function CustomerStep({
             Confirmando…
           </>
         ) : waiting ? (
-          `Aguarde ${wait} s`
+          waitText
         ) : (
           'Confirmar agendamento'
         )}

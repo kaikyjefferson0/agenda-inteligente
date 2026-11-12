@@ -2,6 +2,7 @@ import {
   ArrowLeftIcon,
   CalendarDaysIcon,
   ClockIcon,
+  LogOutIcon,
   MenuIcon,
   ScissorsIcon,
   SettingsIcon,
@@ -13,6 +14,7 @@ import { useEffect, useRef } from 'react'
 import { Link, Outlet, useMatch, useResolvedPath } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import {
   Sidebar,
   SidebarContent,
@@ -37,16 +39,32 @@ interface NavItem {
   label: string
   icon: LucideIcon
   end?: boolean
+  /** Shown only to the Owner (D74). */
+  ownerOnly?: boolean
+}
+
+/** Who is in the panel, from `GET /auth/me`; `null` while it loads. */
+export interface PanelAccount {
+  userName: string
+  businessName: string
+  roleLabel: string
+  isOwner: boolean
+}
+
+interface PanelLayoutProps {
+  account: PanelAccount | null
+  onLogout: () => void
+  loggingOut?: boolean
 }
 
 const AGENDA: NavItem[] = [{ to: '/painel', label: 'Agenda', icon: CalendarDaysIcon, end: true }]
 
 const SETTINGS: NavItem[] = [
-  { to: '/painel/servicos', label: 'Serviços', icon: ScissorsIcon },
-  { to: '/painel/equipe', label: 'Equipe', icon: UsersIcon },
+  { to: '/painel/servicos', label: 'Serviços', icon: ScissorsIcon, ownerOnly: true },
+  { to: '/painel/equipe', label: 'Equipe', icon: UsersIcon, ownerOnly: true },
   { to: '/painel/expediente', label: 'Expediente', icon: ClockIcon },
   { to: '/painel/bloqueios', label: 'Bloqueios', icon: CalendarOffIcon },
-  { to: '/painel/negocio', label: 'Negócio', icon: SettingsIcon },
+  { to: '/painel/negocio', label: 'Negócio', icon: SettingsIcon, ownerOnly: true },
 ]
 
 function PanelNavItem({ item }: { item: NavItem }) {
@@ -136,11 +154,56 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
   )
 }
 
+/** Name, business and role, with the logout: at the foot of the menu and of the drawer. */
+function AccountFooter({ account, onLogout, loggingOut }: PanelLayoutProps) {
+  return (
+    <div className="flex flex-col gap-2 border-t pt-3">
+      {account === null ? (
+        <div aria-hidden="true" className="flex flex-col gap-1.5 px-2 py-1">
+          <span className="h-4 w-32 rounded bg-sidebar-accent" />
+          <span className="h-3.5 w-24 rounded bg-sidebar-accent" />
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-col px-2">
+          <span className="truncate font-medium">{account.userName}</span>
+          <span className="truncate text-sm text-muted-foreground">
+            {account.roleLabel} · {account.businessName}
+          </span>
+        </div>
+      )}
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            type="button"
+            className="h-11 md:h-8"
+            disabled={loggingOut}
+            onClick={onLogout}
+          >
+            {loggingOut ? <Spinner aria-hidden="true" /> : <LogOutIcon aria-hidden="true" />}
+            <span>{loggingOut ? 'Saindo…' : 'Sair'}</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+          <SidebarMenuButton asChild className="h-11 md:h-8">
+            <Link to="/">
+              <ArrowLeftIcon aria-hidden="true" />
+              <span>Voltar ao site</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </div>
+  )
+}
+
 /**
- * Panel of the team (D55): a side menu from 768 px and a drawer below it.
- * The menu shows every page for now; the login step filters it by role.
+ * Panel of the team (D55): a side menu from 768 px and a drawer below it. The
+ * pages of the Owner leave the menu of a Professional (D74); hiding them is
+ * comfort, and the API is what refuses access.
  */
-export function PanelLayout() {
+export function PanelLayout({ account, onLogout, loggingOut = false }: PanelLayoutProps) {
+  const settings = SETTINGS.filter((item) => item.ownerOnly !== true || account?.isOwner === true)
+
   return (
     <SidebarProvider>
       <SkipLink />
@@ -150,25 +213,18 @@ export function PanelLayout() {
         </SidebarHeader>
         <SidebarContent>
           <NavGroup label="Atendimento" items={AGENDA} />
-          <NavGroup label="Configuração" items={SETTINGS} />
+          <NavGroup label="Configuração" items={settings} />
         </SidebarContent>
         <SidebarFooter>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="h-11 md:h-8">
-                <Link to="/">
-                  <ArrowLeftIcon aria-hidden="true" />
-                  <span>Voltar ao site</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+          <AccountFooter account={account} onLogout={onLogout} loggingOut={loggingOut} />
         </SidebarFooter>
       </Sidebar>
       <SidebarInset id="conteudo">
-        <header className="flex h-14 items-center justify-between gap-2 border-b px-4 md:hidden">
+        <header className="flex h-14 items-center justify-between gap-3 border-b px-4 md:hidden">
           <MobileMenuButton />
-          <span className="font-heading font-semibold tracking-tight">Painel</span>
+          <span className="truncate font-heading font-semibold tracking-tight">
+            {account?.businessName ?? 'Painel'}
+          </span>
         </header>
         <div className="flex flex-1 flex-col">
           <Outlet />
