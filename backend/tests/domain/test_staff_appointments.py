@@ -5,15 +5,16 @@ from zoneinfo import ZoneInfo
 from pytest import mark
 
 from app.domain.availability import BusyPeriod, overlaps_any
-from app.domain.errors import ErrorCode
+from app.domain.errors import ErrorCode, SlotRefusal
 from app.domain.staff_appointments import (
     MAX_AGENDA_PERIOD,
     agenda_period_error,
     block_end,
-    fits_staff_hours,
+    busy_refusal,
     is_whole_minute,
     outcome_refusal,
     staff_change_refusal,
+    staff_hours_refusal,
 )
 
 SAO_PAULO = ZoneInfo("America/Sao_Paulo")
@@ -85,14 +86,20 @@ def test_a_block_past_the_calendar_has_no_end() -> None:
 # RN19
 
 
-def fits(starts_at: datetime, minutes: int = 30, *, now: datetime = FROM) -> bool:
-    return fits_staff_hours(
+def refusal(
+    starts_at: datetime, minutes: int = 30, *, now: datetime = FROM
+) -> SlotRefusal | None:
+    return staff_hours_refusal(
         starts_at,
         starts_at + timedelta(minutes=minutes),
         MONDAY_HOURS,
         SAO_PAULO,
         now,
     )
+
+
+def fits(starts_at: datetime, minutes: int = 30, *, now: datetime = FROM) -> bool:
+    return refusal(starts_at, minutes, now=now) is None
 
 
 def test_off_the_grid_and_far_ahead_is_accepted() -> None:
@@ -115,8 +122,41 @@ def test_the_past_is_refused_and_the_present_is_accepted() -> None:
 def test_a_time_beyond_the_local_calendar_never_fits() -> None:
     last = datetime.max.replace(tzinfo=UTC) - timedelta(hours=1)
     hours = [Interval(weekday, time(0), time(23, 59)) for weekday in range(7)]
-    assert not fits_staff_hours(
-        last, last + timedelta(minutes=30), hours, KIRITIMATI, FROM
+    assert (
+        staff_hours_refusal(last, last + timedelta(minutes=30), hours, KIRITIMATI, FROM)
+        is SlotRefusal.OUTSIDE_WORKING_HOURS
+    )
+
+
+# D77: the reason of a refusal, in a fixed order.
+
+
+def test_the_reasons_of_the_hours() -> None:
+    assert refusal(STARTS_AT, now=STARTS_AT + ONE_SECOND) is SlotRefusal.IN_PAST
+    assert refusal(STARTS_AT, minutes=180) is SlotRefusal.OUTSIDE_WORKING_HOURS
+
+
+def test_the_past_comes_before_the_working_hours() -> None:
+    sunday = STARTS_AT - timedelta(days=1)
+    assert refusal(sunday, now=STARTS_AT) is SlotRefusal.IN_PAST
+
+
+def test_a_time_block_comes_before_an_appointment() -> None:
+    end = STARTS_AT + timedelta(minutes=30)
+    busy = [BusyPeriod(STARTS_AT, end)]
+    assert (
+        busy_refusal(STARTS_AT, end, time_blocks=busy, appointments=busy)
+        is SlotRefusal.BLOCKED
+    )
+    assert (
+        busy_refusal(STARTS_AT, end, time_blocks=[], appointments=busy)
+        is SlotRefusal.APPOINTMENT_CONFLICT
+    )
+    assert (
+        busy_refusal(
+            end, end + timedelta(minutes=30), time_blocks=busy, appointments=busy
+        )
+        is None
     )
 
 

@@ -64,19 +64,20 @@ O merge é bloqueado abaixo de:
 | ID | Cenário | Resultado esperado | Nível |
 |---|---|---|---|
 | CT15 | Criação manual fora da antecedência | Aceita | Integração |
-| CT16 | Criação manual sobre outro horário | Recusada | Integração |
+| CT16 | Criação manual sobre outro horário ou sobre bloqueio | Recusada com `SLOT_UNAVAILABLE`, e `reason` `appointment_conflict` ou `blocked` (D77) | Integração |
 | CT17 | Bloqueio sobre agendamento confirmado | Recusado, com a lista de conflitos | Integração |
 | CT18 | Desativar profissional com agendamentos futuros | Recusado até que sejam resolvidos | Integração |
 | CT25 | Expediente ou fuso alterado deixa agendamentos de fora | Aceito; agendamentos mantidos e listados na resposta | Integração |
 | CT33 | Equipe altera agendamento depois do prazo do cliente | Aceito | Integração |
 | CT34 | Marcar resultado antes do início ou alterar status final | Recusado | Unidade e integração |
-| CT35 | Criação ou remarcação pela equipe fora do expediente ou no passado | Recusada com `SLOT_UNAVAILABLE` | Integração |
+| CT35 | Criação ou remarcação pela equipe fora do expediente ou no passado | Recusada com `SLOT_UNAVAILABLE`, e `reason` `outside_working_hours` ou `in_past` (D77) | Integração |
 | CT51 | Agenda com `to <= from` ou período acima de 31 dias; agenda com agendamentos em vários status | `422` nos dois primeiros casos; a agenda devolve também os cancelados, ordenados por início (D25) | Unidade e integração |
 | CT52 | Criação manual sem e-mail e com e-mail | Sem e-mail, nenhum token nem e-mail; com e-mail, o link funciona em `GET /public/appointments/{token}`, e o e-mail é enfileirado (D29) | Integração |
 | CT53 | Remarcação pela equipe sobrepondo o próprio horário atual | Aceita, e o link do cliente continua o mesmo (D30) | Integração |
 | CT54 | Criação manual com serviço inativo, profissional não apto ou horário com segundos | `422` (D28) | Unidade e integração |
 | CT55 | Profissional cria, altera ou marca resultado na agenda de colega; recurso de outro negócio | `403` na agenda de colega; `404` no recurso de outro negócio (D27) | Integração |
 | CT56 | Cancelamento e remarcação pela equipe, dentro e acima da cota de e-mail | E-mail enfileirado ao cliente sem o nome dele e sem o link; acima da cota, `email_status = "skipped"` (D31) | Integração |
+| CT68 | `409 SLOT_UNAVAILABLE` na criação manual e na remarcação pela equipe, com cada motivo e com mais de um ao mesmo tempo; o mesmo `409` na reserva pública e na remarcação pelo link | Nas rotas da equipe, `reason` e o `detail` do motivo, na ordem `changed_meanwhile`, `in_past`, `outside_working_hours`, `blocked`, `appointment_conflict`, com o original intacto na remarcação, e `changed_meanwhile` quando outra alteração mudou o profissional durante a espera dos locks; nas públicas, sem `reason` e com o `detail` genérico (D77) | Unidade e integração |
 
 ### Segurança
 
@@ -144,12 +145,12 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC08 | CT25 |
 | UC09 | CT17, CT31 |
 | UC10 | CT01, CT02, CT03, CT04, CT05 |
-| UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, CT36, CT57, E2E01 |
+| UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, CT36, CT57, CT68, E2E01 |
 | UC12 | CT11, CT36, CT49, CT50, E2E01 |
 | UC13 | CT03, CT12, CT47, CT48, CT49, CT57, E2E01 |
-| UC14 | CT10, CT12, CT13, CT14, CT47, CT48, CT49, CT57 |
+| UC14 | CT10, CT12, CT13, CT14, CT47, CT48, CT49, CT57, CT68 |
 | UC15 | CT20, CT51, CT55, E2E02 |
-| UC16 | CT15, CT16, CT35, CT52, CT54, CT55, CT57 |
-| UC17 | CT33, CT34, CT35, CT53, CT55, CT56, CT57 |
+| UC16 | CT15, CT16, CT35, CT52, CT54, CT55, CT57, CT68 |
+| UC17 | CT33, CT34, CT35, CT53, CT55, CT56, CT57, CT68 |
 | UC18 | CT34, CT55 |
 | Transversal | CT19, CT20, CT29, CT58, CT59, CT60, CT61, CT62, CT63, CT64, CT65, CT66, CT67 |

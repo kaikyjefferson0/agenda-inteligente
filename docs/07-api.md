@@ -236,9 +236,39 @@ Recusas. Antes delas, um corpo ou parâmetro com formato inválido ou campo desc
 - **Período (D25):** `to <= from` ou intervalo acima de 31 × 24 horas responde `422`.
 - **Permissão (D27):** Profissional que pede a agenda de colega, ou cria, altera ou marca resultado em agendamento de colega, recebe `403 FORBIDDEN`. Agendamento, profissional ou serviço de outro negócio responde `404`, igual a inexistente.
 - **Dados da criação e da remarcação (D28, D30):** serviço inativo, profissional que não atende o serviço ou com `is_bookable = false` e `starts_at` com segundos respondem `422`. Na remarcação pela equipe, o serviço inativo também responde `422`, como na criação manual; no link do cliente, o mesmo caso responde `409` (D21), porque o cliente não precisa saber o motivo.
-- **Horário (D28, D30):** no passado, fora do expediente (o bloco inteiro em um intervalo, RN03), sobre agendamento não cancelado ou sobre bloqueio responde `409 SLOT_UNAVAILABLE`. Na remarcação, o agendamento original fica intacto.
+- **Horário (D28, D30):** no passado, fora do expediente (o bloco inteiro em um intervalo, RN03), sobre agendamento não cancelado ou sobre bloqueio responde `409 SLOT_UNAVAILABLE`, com o motivo em `reason` (D77). Na remarcação, o agendamento original fica intacto.
 - **Status (D30, D31):** remarcar ou cancelar fora de `confirmed`, inclusive cancelar duas vezes, responde `409 INVALID_STATUS_TRANSITION`. Não há prazo: a equipe cancela inclusive depois do início (RN20).
 - **Resultado (D32):** concluir ou marcar não comparecimento fora de `confirmed` ou antes de `starts_at` responde `409 INVALID_STATUS_TRANSITION`. No instante exato do início, é aceito.
+
+### Motivo do `409 SLOT_UNAVAILABLE` (D77)
+
+Na criação manual e na remarcação pela equipe, o `409 SLOT_UNAVAILABLE` traz o campo `reason`, e o `detail` diz o motivo em português:
+
+| `reason` | Quando | `detail` |
+|---|---|---|
+| `changed_meanwhile` | Só na remarcação sem `professional_id`: outra alteração mudou o profissional do agendamento enquanto a requisição esperava os locks, e o horário não chegou a ser conferido | O agendamento foi alterado por outra pessoa durante a remarcação. Atualize a agenda e tente de novo. |
+| `in_past` | `starts_at` antes de agora (RN19) | Este horário já passou. |
+| `outside_working_hours` | O bloco, com o preparo, não cabe em um intervalo do expediente (RN03, RN19) | O atendimento, com o preparo, não cabe em um intervalo do expediente do profissional. |
+| `blocked` | O bloco sobrepõe um bloqueio do profissional (RN04) | Este horário cai em um bloqueio do profissional. |
+| `appointment_conflict` | O bloco sobrepõe outro agendamento não cancelado (RN04, RN14) | Este horário coincide com outro agendamento do profissional. |
+
+```json
+{
+  "type": "https://api.exemplo.com/problems/slot-unavailable",
+  "title": "Horário indisponível",
+  "status": 409,
+  "code": "SLOT_UNAVAILABLE",
+  "detail": "O atendimento, com o preparo, não cabe em um intervalo do expediente do profissional.",
+  "reason": "outside_working_hours"
+}
+```
+
+- **Ordem:** quando mais de um motivo vale, vem o primeiro de `changed_meanwhile`, `in_past`, `outside_working_hours`, `blocked` e `appointment_conflict`. `changed_meanwhile` vem antes de todos porque é decidido antes de conferir o horário: com ele, nenhum dos outros chega a ser avaliado. O passado e o expediente são conferidos antes de consultar a agenda; o bloqueio vem antes do agendamento porque é uma ausência do próprio profissional, que outro horário no mesmo período não resolve.
+- **`changed_meanwhile` pede outra reação:** o horário pedido pode estar livre, mas o agendamento já não é o que a tela mostrava. O cliente da API relê o agendamento em vez de oferecer outros horários. A diferença está no valor de `reason`, nunca só no texto do `detail`.
+- **Remarcação:** o motivo é sobre o profissional que receberia o agendamento.
+- **Concorrência:** quando a exclusion constraint recusa a gravação (RN14), o motivo é `appointment_conflict`, porque ela só existe entre agendamentos.
+- **Rotas públicas:** a reserva e a remarcação pelo link continuam com o `409 SLOT_UNAVAILABLE` genérico, sem `reason` e com o `detail` "Este horário acabou de ser reservado.", para não revelar ao cliente o expediente, os bloqueios e a ocupação do negócio.
+- **OpenAPI e tipo de conteúdo:** o `409` das duas rotas é o schema `StaffConflictProblem`, com `reason` do tipo `SlotRefusal`. O OpenAPI o lista como `application/json`, como faz com o `422`, mas a resposta real sai como `application/problem+json`, como todo erro da API. `tests/appointments/test_refusal_reasons.py` confere o `Content-Type` em cada motivo.
 
 ## Público
 
@@ -333,7 +363,7 @@ Content-Type: application/json
 
 - `Idempotency-Key` é obrigatória e precisa ser um UUID com hifens, de qualquer versão. Ausente ou inválida, responde `422`.
 - `customer.name` tem de 1 a 120 caracteres, sem caracteres de controle, e `customer.phone` segue o formato E.164, como no exemplo. O frontend converte o que for digitado.
-- `starts_at` fora da grade responde `422 VALIDATION_ERROR`, inclusive na segunda ocorrência de um horário ambíguo. Na grade, mas ocupado, fora do expediente ou da antecedência, responde `409 SLOT_UNAVAILABLE`.
+- `starts_at` fora da grade responde `422 VALIDATION_ERROR`, inclusive na segunda ocorrência de um horário ambíguo. Na grade, mas ocupado, fora do expediente ou da antecedência, responde `409 SLOT_UNAVAILABLE`, sem `reason` (D77).
 - `email_status` pode ser `queued` ou `skipped`, quando um limite de envio foi atingido (RN26).
 - Em uma repetição idempotente, a resposta é `200`, com o mesmo agendamento, `access_url: null` e `email_status: "unchanged"` (RN13).
 - Se o limite de e-mail impediu o envio na criação, a repetição responde `200`, com o mesmo agendamento, um novo `access_url` e `email_status: "skipped"`. O link anterior deixa de funcionar, e nenhum e-mail é enfileirado (RN13, RN26).
@@ -424,7 +454,7 @@ Recusas, em ordem. Antes delas, um corpo com formato inválido ou campo desconhe
 - **Status (D19):** agendamento fora de `confirmed`, inclusive já cancelado, responde `409 INVALID_STATUS_TRANSITION`.
 - **Prazo (D19):** `agora > início atual - prazo` responde `409 CHANGE_DEADLINE_PASSED`. O limite exato é permitido.
 - **Serviço desativado (D21):** a remarcação responde `409 SLOT_UNAVAILABLE`; o cancelamento continua permitido.
-- **Corpo da remarcação (D20):** `starts_at` fora da grade, `422`; profissional inexistente ou de outro negócio, `404`; profissional que não atende o serviço ou com `is_bookable = false`, `422`; horário ocupado, fora do expediente, fora da antecedência ou sobrepondo o horário atual, `409 SLOT_UNAVAILABLE`. Em qualquer recusa, o agendamento original fica intacto.
+- **Corpo da remarcação (D20):** `starts_at` fora da grade, `422`; profissional inexistente ou de outro negócio, `404`; profissional que não atende o serviço ou com `is_bookable = false`, `422`; horário ocupado, fora do expediente, fora da antecedência ou sobrepondo o horário atual, `409 SLOT_UNAVAILABLE`, sem `reason` (D77). Em qualquer recusa, o agendamento original fica intacto.
 - **Limite (D22):** as três rotas compartilham um contador de 60 requisições por minuto por IP, e toda requisição conta, inclusive `404` e `422`. Acima dele, `429` com `Retry-After`.
 
 Todas as respostas dessas rotas, inclusive as de erro, levam `Cache-Control: no-store` e `Referrer-Policy: no-referrer` (D22). A exceção é o `500 INTERNAL_ERROR` genérico, montado pelo Starlette fora do middleware que acrescenta esses cabeçalhos: ele sai sem eles, mas tem corpo fixo, sem o token nem dados do agendamento. O log de acesso registra o caminho com o token trocado por `***` (D24).
@@ -447,7 +477,7 @@ Todas as respostas dessas rotas, inclusive as de erro, levam `Cache-Control: no-
 | `403` | `REGISTRATION_DISABLED` | Cadastro desligado |
 | `403` | `DEMO_RESTRICTED` | Operação travada no negócio demo |
 | `404` | `NOT_FOUND` | Inexistente, de outro negócio ou token inválido |
-| `409` | `SLOT_UNAVAILABLE` | Horário ocupado, horário no passado, fora do expediente ou da antecedência |
+| `409` | `SLOT_UNAVAILABLE` | Horário ocupado, horário no passado, fora do expediente ou da antecedência; nas rotas da equipe, inclui `reason` (D77) |
 | `409` | `CHANGE_DEADLINE_PASSED` | Prazo do cliente vencido |
 | `409` | `INVALID_STATUS_TRANSITION` | Agendamento em status final ou resultado antes do início |
 | `409` | `APPOINTMENT_CONFLICTS` | Bloqueio ou desativação com conflitos; inclui `conflicts` |

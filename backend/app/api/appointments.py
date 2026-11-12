@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Query, status
@@ -9,6 +9,7 @@ from app.schemas.appointments import (
     CreatedAppointmentResponse,
     StaffAppointmentData,
     StaffChangeResponse,
+    StaffConflictProblem,
     StaffRescheduleRequest,
 )
 from app.schemas.schedule import UtcInstant
@@ -17,6 +18,20 @@ from app.services.staff_appointments import StaffChange, StaffCustomer
 
 # D33: authenticated, so no limit by IP, like the other administration routes.
 router = APIRouter(prefix="/appointments", tags=["appointments"])
+
+
+def _conflict(description: str) -> dict[int | str, dict[str, Any]]:
+    """D77: the 409 in the OpenAPI, so the frontend types `reason`.
+
+    FastAPI lists it as `application/json`, as it does with the 422; the body
+    goes out as `application/problem+json`, like every error.
+    """
+    return {
+        status.HTTP_409_CONFLICT: {
+            "model": StaffConflictProblem,
+            "description": description,
+        }
+    }
 
 
 def _change_response(change: StaffChange) -> StaffChangeResponse:
@@ -46,7 +61,11 @@ async def list_agenda(
     return [StaffAppointmentData.model_validate(item) for item in agenda]
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    responses=_conflict("SLOT_UNAVAILABLE, com o motivo em `reason`"),
+)
 async def create_appointment(
     body: CreateAppointmentRequest,
     current: CurrentSessionDep,
@@ -78,7 +97,12 @@ async def create_appointment(
     )
 
 
-@router.post("/{appointment_id}/reschedule")
+@router.post(
+    "/{appointment_id}/reschedule",
+    responses=_conflict(
+        "SLOT_UNAVAILABLE, com o motivo em `reason`, ou INVALID_STATUS_TRANSITION"
+    ),
+)
 async def reschedule_appointment(
     appointment_id: UUID,
     body: StaffRescheduleRequest,

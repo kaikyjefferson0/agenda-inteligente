@@ -95,6 +95,8 @@ async def test_two_manual_bookings_of_the_same_time_leave_one(
     )
 
     assert sorted(item.status_code for item in responses) == [201, 409]
+    refused = next(item for item in responses if item.status_code == 409)
+    assert refused.json()["reason"] == "appointment_conflict"
     assert await count_appointments(db) == 1
 
 
@@ -207,7 +209,7 @@ async def test_the_exclusion_constraint_is_the_last_defense(
         service["id"],
         monday_10 + timedelta(hours=2),
     )
-    monkeypatch.setattr(staff_appointments, "overlaps_any", lambda *_: False)
+    monkeypatch.setattr(staff_appointments, "busy_refusal", lambda *_, **__: None)
 
     booked = await post_manual(
         client,
@@ -224,6 +226,8 @@ async def test_the_exclusion_constraint_is_the_last_defense(
     for response in (booked, rescheduled):
         assert response.status_code == 409, response.text
         assert response.json()["code"] == "SLOT_UNAVAILABLE"
+        # D77: the constraint is the one between appointments.
+        assert response.json()["reason"] == "appointment_conflict"
     assert await count_appointments(db) == 2
     assert await count_emails(db, CONFIRMATION) == 0
     # The rollback keeps the original time.
@@ -272,6 +276,12 @@ async def test_d30_moved_to_an_unlocked_professional_while_waiting_for_the_locks
 
     assert response.status_code == status, response.text
     assert response.json()["code"] == code
+    if status == 409:  # D77: the other change, not the time, is the reason.
+        assert response.json()["reason"] == "changed_meanwhile"
+        assert response.json()["detail"] == (
+            "O agendamento foi alterado por outra pessoa durante a remarcação. "
+            "Atualize a agenda e tente de novo."
+        )
     # The row is the one the other change left, with the original time.
     stored = await get_appointment(db, created["id"])
     assert str(stored.professional_id) == colleague.professional_id

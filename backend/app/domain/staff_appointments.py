@@ -2,7 +2,8 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from app.domain.errors import ErrorCode
+from app.domain.availability import BusyPeriod, overlaps_any
+from app.domain.errors import ErrorCode, SlotRefusal
 from app.domain.schedule import WeeklyInterval, fits_working_hours
 
 # D25: 31 × 24 hours exactly, the limit included.
@@ -33,24 +34,45 @@ def block_end(
         return None
 
 
-def fits_staff_hours(
+def staff_hours_refusal(
     starts_at: datetime,
     blocked_until: datetime,
     intervals: Iterable[WeeklyInterval],
     timezone: ZoneInfo,
     now: datetime,
-) -> bool:
+) -> SlotRefusal | None:
     """RN19: not in the past, and the whole block in a single interval (RN03).
 
-    Neither the grid nor the advance limits apply. Conflicts (RN04) are checked
-    apart, against the busy periods.
+    None means it fits. Neither the grid nor the advance limits apply.
+    Conflicts (RN04) are checked apart, by `busy_refusal`, against the busy
+    periods. The past comes first (D77).
     """
     if starts_at < now:
-        return False
+        return SlotRefusal.IN_PAST
     try:
-        return fits_working_hours(starts_at, blocked_until, intervals, timezone)
+        fits = fits_working_hours(starts_at, blocked_until, intervals, timezone)
     except OverflowError:  # No working hours reach the end of the calendar.
-        return False
+        fits = False
+    return None if fits else SlotRefusal.OUTSIDE_WORKING_HOURS
+
+
+def busy_refusal(
+    starts_at: datetime,
+    blocked_until: datetime,
+    *,
+    time_blocks: Iterable[BusyPeriod],
+    appointments: Iterable[BusyPeriod],
+) -> SlotRefusal | None:
+    """RN04 and RN14, with half-open periods. None means free.
+
+    A time block comes before an appointment (D77): the block is the
+    professional's own absence, which another time on the same day will not fix.
+    """
+    if overlaps_any(starts_at, blocked_until, time_blocks):
+        return SlotRefusal.BLOCKED
+    if overlaps_any(starts_at, blocked_until, appointments):
+        return SlotRefusal.APPOINTMENT_CONFLICT
+    return None
 
 
 def staff_change_refusal(*, is_confirmed: bool) -> ErrorCode | None:

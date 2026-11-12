@@ -4,6 +4,7 @@ from uuid import UUID
 
 from pydantic import AfterValidator, EmailStr, Field
 
+from app.domain.errors import SlotRefusal
 from app.domain.staff_appointments import is_whole_minute
 from app.models import AppointmentOrigin, AppointmentStatus
 from app.schemas.common import CustomerName, CustomerPhone, RequestModel, ResponseModel
@@ -72,3 +73,25 @@ class CreatedAppointmentResponse(StaffAppointmentData):
 
 class StaffChangeResponse(StaffAppointmentData):
     email_status: StaffEmailStatus
+
+
+class StaffConflictProblem(ResponseModel):
+    """The 409 of the team's routes, as `application/problem+json`.
+
+    D77: `SLOT_UNAVAILABLE` always brings `reason`, and `detail` tells it in
+    Portuguese. The public routes answer the same code without `reason`.
+    """
+
+    type: str
+    title: str
+    status: Literal[409]
+    code: Literal["SLOT_UNAVAILABLE", "INVALID_STATUS_TRANSITION"]
+    detail: str
+    reason: SlotRefusal | None = Field(
+        default=None,
+        description=(
+            "Só em SLOT_UNAVAILABLE. Se mais de um valer, vem o primeiro desta "
+            "ordem: changed_meanwhile (só na remarcação), in_past, "
+            "outside_working_hours, blocked, appointment_conflict"
+        ),
+    )
