@@ -3,7 +3,8 @@ import { useParams } from 'react-router'
 
 import { ErrorMessage } from '@/components/feedback/ErrorMessage'
 import { PageLoader } from '@/components/feedback/PageLoader'
-import { BookingFlow, BusinessNotFound, businessQuery, isNotFound } from '@/features/booking'
+import { BookingFlow, BusinessNotFound } from '@/features/booking'
+import { businessQuery, isNotFound } from '@/features/scheduling'
 
 /** `/n/:slug`: the public page of a business (UC10 and UC11). */
 export function BusinessPage() {

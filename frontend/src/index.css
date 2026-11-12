@@ -201,8 +201,9 @@
 }
 
 /* Radix focuses the dialog container itself (tabindex="-1") when it opens; it
-   is not a control, so it gets no ring around the whole drawer. */
-[role='dialog'][tabindex='-1']:focus-visible {
+   is not a control, so it gets no ring around the whole drawer or dialog. */
+[role='dialog'][tabindex='-1']:focus-visible,
+[role='alertdialog'][tabindex='-1']:focus-visible {
   outline: none;
 }
 

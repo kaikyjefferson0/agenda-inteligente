@@ -5,7 +5,7 @@ import { formatLocalDate, formatTime, toLocalDate } from '@/lib/datetime'
 import { formatDuration, formatPrice } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import type { PublicService } from '../queries'
+import type { PublicService } from '@/features/scheduling'
 
 interface BookingSummaryProps {
   timeZone: string

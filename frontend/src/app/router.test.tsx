@@ -42,7 +42,8 @@ describe('router (D54)', () => {
   })
 
   it.each([
-    [PATHS.customerAppointment('abc'), 'Seu agendamento'],
+    // An unknown token: the link page answers the API's 404.
+    [PATHS.customerAppointment('abc'), 'Este link não abre mais o agendamento'],
     [PATHS.invitation('abc'), 'Aceitar convite'],
     [PATHS.resetPassword('abc'), 'Definir nova senha'],
     [PATHS.business('barbearia-demo'), 'Barbearia Demo'],
@@ -57,7 +58,7 @@ describe('router (D54)', () => {
   it('keeps the token out of the Referer on pages opened from a link', async () => {
     renderAt(PATHS.customerAppointment('abc'))
 
-    await screen.findByRole('heading', { level: 1, name: 'Seu agendamento' })
+    await screen.findByRole('heading', { level: 1, name: 'Este link não abre mais o agendamento' })
     expect(document.querySelector('meta[name="referrer"]')).toHaveAttribute(
       'content',
       'no-referrer',
