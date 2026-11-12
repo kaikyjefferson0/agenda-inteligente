@@ -21,6 +21,18 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+// jsdom has no ResizeObserver; the radio group of Radix measures its items with it.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+Object.defineProperty(window, 'ResizeObserver', {
+  configurable: true,
+  writable: true,
+  value: ResizeObserverStub,
+})
+
 // Any request without a handler fails the test instead of reaching the network.
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 afterEach(() => {

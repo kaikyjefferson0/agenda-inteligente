@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  addLocalDays,
   formatDate,
   formatDateTime,
   formatLocalDate,
+  formatLocalDayParts,
   formatTime,
   formatTimeRange,
   formatWeekday,
+  isLocalDate,
+  localDateRange,
+  localHour,
   parseInstant,
   toLocalDate,
 } from './datetime'
@@ -131,5 +136,40 @@ describe('formatLocalDate', () => {
 
   it.each(['2026-02-30', '10/11/2026', '2026-11-10T00:00:00Z'])('refuses %s', (value) => {
     expect(() => formatLocalDate(value)).toThrow(RangeError)
+  })
+})
+
+describe('local days', () => {
+  it('tells a real calendar day apart', () => {
+    expect(isLocalDate('2026-11-10')).toBe(true)
+    expect(isLocalDate('2028-02-29')).toBe(true)
+    expect(isLocalDate('2026-02-29')).toBe(false)
+    expect(isLocalDate('2026-11-10T00:00:00Z')).toBe(false)
+    expect(isLocalDate('')).toBe(false)
+  })
+
+  it('adds days across months, years and the DST change, without any time zone', () => {
+    expect(addLocalDays('2026-11-30', 1)).toBe('2026-12-01')
+    expect(addLocalDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addLocalDays('2018-11-03', 1)).toBe('2018-11-04')
+    expect(addLocalDays('2026-03-01', -1)).toBe('2026-02-28')
+    expect(() => addLocalDays('2026-02-30', 1)).toThrow(RangeError)
+  })
+
+  it('lists consecutive days, inclusive', () => {
+    expect(localDateRange('2026-11-29', 3)).toEqual(['2026-11-29', '2026-11-30', '2026-12-01'])
+    expect(localDateRange('2026-11-29', 0)).toEqual([])
+  })
+
+  it('splits a day for the day picker, without the abbreviation dots', () => {
+    expect(formatLocalDayParts('2026-11-10')).toEqual({ weekday: 'ter', day: '10', month: 'nov' })
+    expect(formatLocalDayParts('2026-02-01')).toEqual({ weekday: 'dom', day: '1', month: 'fev' })
+    expect(() => formatLocalDayParts('2026-02-30')).toThrow(RangeError)
+  })
+
+  it('reads the hour in the business, not in the browser', () => {
+    // 12:00 UTC is 21:00 in Tokyo and 09:00 in São Paulo.
+    expect(localHour('2026-11-10T12:00:00Z', SAO_PAULO)).toBe(9)
+    expect(localHour('2026-11-10T23:30:00-03:00', SAO_PAULO)).toBe(23)
   })
 })

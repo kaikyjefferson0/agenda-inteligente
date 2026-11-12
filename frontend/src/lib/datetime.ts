@@ -111,3 +111,58 @@ export function formatLocalDate(localDate: string): string {
   if (date.getUTCDate() !== Number(day)) throw new RangeError(`Invalid local date: ${localDate}`)
   return `${formatter('UTC', WEEKDAY).format(date)}, ${formatter('UTC', DATE).format(date)}`
 }
+
+function parseLocalDate(localDate: string): Date | null {
+  const match = LOCAL_DATE.exec(localDate)
+  if (match === null) return null
+  const [, year, month, day] = match
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
+  return date.getUTCDate() === Number(day) ? date : null
+}
+
+/** Whether the string is a real calendar day as `YYYY-MM-DD` (e.g. not `2026-02-30`). */
+export function isLocalDate(value: string): boolean {
+  return parseLocalDate(value) !== null
+}
+
+/** The calendar day `days` after `localDate`, as `YYYY-MM-DD`. Pure date math, no time zone. */
+export function addLocalDays(localDate: string, days: number): string {
+  const date = parseLocalDate(localDate)
+  if (date === null) throw new RangeError(`Invalid local date: ${localDate}`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+/** `count` consecutive calendar days from `first`, inclusive. */
+export function localDateRange(first: string, count: number): string[] {
+  return Array.from({ length: Math.max(0, count) }, (_, index) => addLocalDays(first, index))
+}
+
+export interface LocalDayParts {
+  /** `ter`, without the abbreviation dot. */
+  weekday: string
+  /** `12` */
+  day: string
+  /** `nov`, without the abbreviation dot. */
+  month: string
+}
+
+const SHORT_WEEKDAY: Intl.DateTimeFormatOptions = { weekday: 'short' }
+const SHORT_MONTH: Intl.DateTimeFormatOptions = { month: 'short' }
+
+/** The pieces of a calendar day for a compact day picker. */
+export function formatLocalDayParts(localDate: string): LocalDayParts {
+  const date = parseLocalDate(localDate)
+  if (date === null) throw new RangeError(`Invalid local date: ${localDate}`)
+  const strip = (text: string) => text.replace('.', '')
+  return {
+    weekday: strip(formatter('UTC', SHORT_WEEKDAY).format(date)),
+    day: String(date.getUTCDate()),
+    month: strip(formatter('UTC', SHORT_MONTH).format(date)),
+  }
+}
+
+/** The hour (0 to 23) of the instant in the business. */
+export function localHour(instant: Instant, timeZone: string): number {
+  return Number(formatTime(instant, timeZone).slice(0, 2))
+}
