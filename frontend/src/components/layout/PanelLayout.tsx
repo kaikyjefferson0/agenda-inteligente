@@ -219,7 +219,8 @@ export function PanelLayout({ account, onLogout, loggingOut = false }: PanelLayo
           <AccountFooter account={account} onLogout={onLogout} loggingOut={loggingOut} />
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset id="conteudo">
+      {/* min-w-0: a wide child, such as the agenda grid, scrolls inside itself, never the page. */}
+      <SidebarInset id="conteudo" className="min-w-0">
         <header className="flex h-14 items-center justify-between gap-3 border-b px-4 md:hidden">
           <MobileMenuButton />
           <span className="truncate font-heading font-semibold tracking-tight">

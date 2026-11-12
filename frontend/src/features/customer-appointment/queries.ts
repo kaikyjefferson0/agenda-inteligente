@@ -7,7 +7,6 @@ import { schedulingKeys } from '@/features/scheduling'
 export type CustomerAppointment = components['schemas']['CustomerAppointmentResponse']
 export type CustomerChange = components['schemas']['CustomerChangeResponse']
 export type RescheduleBody = components['schemas']['RescheduleRequest']
-export type AppointmentStatus = components['schemas']['AppointmentStatus']
 
 /**
  * The token is only a key of the cache in memory: it never goes into the

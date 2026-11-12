@@ -7,19 +7,17 @@ import { ErrorMessage } from '@/components/feedback/ErrorMessage'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-
 import {
+  ContinueButton,
   customerFieldOf,
-  customerSchema,
   SERVER_FIELD_MESSAGES,
   toE164,
-  type CustomerInput,
-  type CustomerValues,
-} from '../customer-schema'
+} from '@/features/scheduling'
+import { useRetryAfter } from '@/hooks/use-retry-after'
+
+import { customerSchema, type CustomerInput, type CustomerValues } from '../customer-schema'
 import { useIdempotencyKey } from '../idempotency'
 import { useCreateBooking, type Booking, type CreateBookingBody } from '../queries'
-import { ContinueButton } from '@/features/scheduling'
-import { useRetryAfter } from '@/hooks/use-retry-after'
 
 interface CustomerStepProps {
   slug: string

@@ -33,6 +33,17 @@ Object.defineProperty(window, 'ResizeObserver', {
   value: ResizeObserverStub,
 })
 
+// jsdom has no pointer capture nor scrollIntoView; the Select of Radix uses them.
+for (const name of ['hasPointerCapture', 'setPointerCapture', 'releasePointerCapture', 'scrollIntoView'] as const) {
+  if (!(name in Element.prototype)) {
+    Object.defineProperty(Element.prototype, name, {
+      configurable: true,
+      writable: true,
+      value: name === 'hasPointerCapture' ? () => false : () => {},
+    })
+  }
+}
+
 // Any request without a handler fails the test instead of reaching the network.
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }))
 afterEach(() => {
@@ -48,6 +59,8 @@ beforeEach(async () => {
   const { localLock, silentChannel } = await import('@/features/auth/session/tab-sync')
   const { memoryHint } = await import('@/features/auth/session/session-hint')
   const { authApi } = await import('./msw/auth')
+  const { teamApi } = await import('./msw/team-agenda')
   authApi.reset()
+  teamApi.reset()
   replaceAppSession({ lock: localLock(), channel: silentChannel(), hint: memoryHint(), askTimeoutMs: 5 })
 })

@@ -8,12 +8,19 @@ import {
   formatLocalDayParts,
   formatTime,
   formatTimeRange,
+  formatMinutes,
   formatWeekday,
   isLocalDate,
   localDateRange,
+  localDateTimeToInstant,
   localHour,
+  localMinutes,
+  localWeekday,
   parseInstant,
+  parseLocalTime,
+  startOfLocalDay,
   toLocalDate,
+  toUtcInstant,
 } from './datetime'
 
 const SAO_PAULO = 'America/Sao_Paulo'
@@ -144,6 +151,7 @@ describe('local days', () => {
     expect(isLocalDate('2026-11-10')).toBe(true)
     expect(isLocalDate('2028-02-29')).toBe(true)
     expect(isLocalDate('2026-02-29')).toBe(false)
+    expect(isLocalDate('2026-13-01')).toBe(false)
     expect(isLocalDate('2026-11-10T00:00:00Z')).toBe(false)
     expect(isLocalDate('')).toBe(false)
   })
@@ -171,5 +179,83 @@ describe('local days', () => {
     // 12:00 UTC is 21:00 in Tokyo and 09:00 in São Paulo.
     expect(localHour('2026-11-10T12:00:00Z', SAO_PAULO)).toBe(9)
     expect(localHour('2026-11-10T23:30:00-03:00', SAO_PAULO)).toBe(23)
+  })
+})
+
+describe('local time to instant (RN06)', () => {
+  it('reads a local time in the business, never in the browser', () => {
+    expect(localDateTimeToInstant('2026-11-10', '09:07', SAO_PAULO)).toEqual({
+      kind: 'ok',
+      instant: new Date('2026-11-10T12:07:00Z'),
+    })
+    expect(localDateTimeToInstant('2026-11-10', '09:07', 'Asia/Tokyo')).toEqual({
+      kind: 'ok',
+      instant: new Date('2026-11-10T00:07:00Z'),
+    })
+  })
+
+  it('refuses a time skipped when daylight time started (04/11/2018 00:30)', () => {
+    expect(localDateTimeToInstant('2018-11-04', '00:30', SAO_PAULO)).toEqual({ kind: 'nonexistent' })
+    expect(localDateTimeToInstant('2018-11-04', '01:00', SAO_PAULO)).toEqual({
+      kind: 'ok',
+      instant: new Date('2018-11-04T03:00:00Z'),
+    })
+  })
+
+  it('takes the first occurrence of a repeated time when it ended (16/02/2019 23:30)', () => {
+    expect(localDateTimeToInstant('2019-02-16', '23:30', SAO_PAULO)).toEqual({
+      kind: 'ok',
+      instant: new Date('2019-02-17T01:30:00Z'),
+    })
+  })
+
+  it('refuses what is not a day and a time', () => {
+    expect(() => localDateTimeToInstant('2026-02-30', '09:00', SAO_PAULO)).toThrow(RangeError)
+    expect(() => localDateTimeToInstant('2026-11-10', '24:00', SAO_PAULO)).toThrow(RangeError)
+  })
+})
+
+describe('start of a local day', () => {
+  it('is midnight of the business on an ordinary day', () => {
+    expect(startOfLocalDay('2026-11-10', SAO_PAULO)).toEqual(new Date('2026-11-10T03:00:00Z'))
+  })
+
+  it('is 01:00 on the day midnight did not exist in São Paulo', () => {
+    expect(startOfLocalDay('2018-11-04', SAO_PAULO)).toEqual(new Date('2018-11-04T03:00:00Z'))
+    expect(startOfLocalDay('2018-11-05', SAO_PAULO)).toEqual(new Date('2018-11-05T02:00:00Z'))
+  })
+
+  it('makes a day of 23 or 25 hours across the changes', () => {
+    const hours = (day: string) =>
+      (startOfLocalDay(addLocalDays(day, 1), SAO_PAULO).getTime() - startOfLocalDay(day, SAO_PAULO).getTime()) /
+      3_600_000
+    expect(hours('2018-11-04')).toBe(23)
+    expect(hours('2019-02-16')).toBe(25)
+    expect(hours('2026-11-10')).toBe(24)
+  })
+})
+
+describe('local clock pieces', () => {
+  it('gives the minutes of the wall clock in the business', () => {
+    expect(localMinutes('2026-11-10T12:07:00Z', SAO_PAULO)).toBe(9 * 60 + 7)
+    expect(localMinutes('2026-11-10T02:59:00Z', SAO_PAULO)).toBe(23 * 60 + 59)
+  })
+
+  it('parses and formats a time of the day', () => {
+    expect(parseLocalTime('09:07')).toBe(547)
+    expect(parseLocalTime('9:07')).toBeNull()
+    expect(parseLocalTime('24:00')).toBeNull()
+    expect(formatMinutes(547)).toBe('09:07')
+    expect(formatMinutes(0)).toBe('00:00')
+  })
+
+  it('writes an instant for the API in UTC, without fractions', () => {
+    expect(toUtcInstant(new Date('2026-11-10T09:07:00-03:00'))).toBe('2026-11-10T12:07:00Z')
+  })
+
+  it('counts the weekday from Monday, as the API', () => {
+    expect(localWeekday('2026-11-09')).toBe(0)
+    expect(localWeekday('2026-11-15')).toBe(6)
+    expect(() => localWeekday('2026-13-01')).toThrow(RangeError)
   })
 })
