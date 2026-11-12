@@ -45,7 +45,7 @@ describe('router (D54)', () => {
     [PATHS.customerAppointment('abc'), 'Seu agendamento'],
     [PATHS.invitation('abc'), 'Aceitar convite'],
     [PATHS.resetPassword('abc'), 'Definir nova senha'],
-    [PATHS.business('barbearia-demo'), 'Página do negócio'],
+    [PATHS.business('barbearia-demo'), 'Barbearia Demo'],
     [PATHS.login, 'Entrar'],
     [PATHS.forgotPassword, 'Esqueci minha senha'],
   ])('has the page %s', async (path, title) => {

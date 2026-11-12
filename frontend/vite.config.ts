@@ -49,10 +49,11 @@ export default defineConfig(({ mode }) => {
         include: ['src/**/*.{ts,tsx}'],
         exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/api/schema.d.ts', 'src/**/*.d.ts'],
         reporter: ['text', 'html'],
-        // D57: at least 80% in src/lib and src/api.
+        // D57: at least 80% in src/lib, src/api and src/features/booking.
         thresholds: {
           'src/lib/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
           'src/api/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+          'src/features/booking/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
         },
       },
     },

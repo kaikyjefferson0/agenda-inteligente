@@ -1,6 +1,6 @@
 # 9. Frontend
 
-SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D62 dos [Pontos a revisar](README.md#pontos-a-revisar).
+SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D65 dos [Pontos a revisar](README.md#pontos-a-revisar).
 
 ## Estrutura de pastas
 
@@ -15,14 +15,15 @@ frontend/src/
 │   ├── layout/   # PublicLayout, PanelLayout, marca, link de pular e página provisória
 │   ├── feedback/ # ErrorMessage, PageLoader e RouteError
 │   └── marketing/# Seção principal da página inicial (Magic, D58)
-├── features/     # Vazia nesta etapa: cada etapa seguinte cria a sua pasta
+├── features/
+│   └── booking/  # Agendamento público (UC10 e UC11): componentes, consultas e formulário
 ├── hooks/        # Hooks compartilhados, como o use-mobile do sidebar
 ├── lib/          # Funções puras: datas e fusos, esquema de cores, prévia da demo e utilitários
 ├── pages/        # Páginas por grupo de rotas: public/, account/, panel/ e a 404
 └── test/         # Configuração do Vitest e servidor do MSW com os handlers
 ```
 
-Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam agrupadas por grupo de rotas, e não em uma lista plana, porque cada grupo é um módulo carregado sob demanda (D54). `features/` vai reunir, por funcionalidade, os componentes, consultas e formulários das próximas etapas; as páginas apenas os compõem.
+Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam agrupadas por grupo de rotas, e não em uma lista plana, porque cada grupo é um módulo carregado sob demanda (D54). `features/` reúne, por funcionalidade, os componentes, as consultas do TanStack Query e os formulários; as páginas apenas os compõem.
 
 ## Rotas (D54)
 
@@ -39,7 +40,7 @@ Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam a
 | `/painel/servicos`, `/equipe`, `/expediente`, `/bloqueios`, `/negocio` | Configuração | Painel |
 | Qualquer outra | Página não encontrada | Principal |
 
-- Nesta etapa, só `/` e a 404 são definitivas. As demais são provisórias, com o título e uma frase do que virá.
+- `/`, `/n/:slug` e a 404 são definitivas. As demais são provisórias, com o título e uma frase do que virá.
 - Cada grupo (público, conta e painel) é um módulo importado com `lazy`, que o Vite separa em um arquivo próprio. O layout público e a 404 ficam no arquivo principal.
 - Cada grupo tem um `errorElement` (`RouteError`), então um erro no painel não derruba as páginas públicas. Uma falha ao baixar o módulo, comum logo depois de um deploy, se resolve recarregando a página.
 - As páginas abertas por um link com token (`/agendamento`, `/convite` e `/recuperar-senha`) declaram `<meta name="referrer" content="no-referrer">`, para o token não sair no cabeçalho `Referer`.
@@ -157,6 +158,71 @@ Contraste medido na página renderizada, com o chrome-devtools:
 - **Marca** (`Brand`): glifo próprio em SVG, com três fichas de horário e a do meio escolhida.
 - **Página inicial:** texto para o dono do negócio. A prévia da hero é uma ilustração estática numa moldura de celular, escondida dos leitores de tela; os horários não têm borda, hover nem cursor de clique. A data mostrada é o próximo dia de expediente da demo, a partir de hoje no fuso do negócio (`src/lib/demo-preview.ts`). "Como funciona" mostra três passos, cada um com um recorte da interface em vez de ícone.
 
+## Agendamento público (UC10 e UC11)
+
+`/n/:slug` mostra o negócio (`GET /public/businesses/{slug}`) e o fluxo de agendamento. O código fica em `src/features/booking`; a página (`src/pages/public/BusinessPage.tsx`) só escolhe entre carregando, não encontrado, erro e o fluxo.
+
+| Arquivo | Conteúdo |
+|---|---|
+| `queries.ts` | `businessQuery`, `availabilityQuery` e `useCreateBooking`, com as chaves `['public', 'business', slug, ...]` |
+| `use-booking-flow.ts` | Estado do fluxo a partir da URL e do histórico (D65) |
+| `idempotency.ts` | Chave de idempotência por tentativa (D64) |
+| `customer-schema.ts` | Esquema zod dos dados do cliente, textos em português e conversão para E.164 (D63) |
+| `components/` | Passos, escolha de dia e horário, resumo, tela de sucesso e página de não encontrado |
+
+### Passos
+
+1. **Serviço:** lista de opções com duração e preço. Um serviço ativo sem profissional aparece desabilitado.
+2. **Profissional:** "Qualquer profissional" (padrão, sem `professional_id`, RN10) ou um dos aptos ao serviço. Com um só profissional, o passo é pulado e o nome aparece no resumo.
+3. **Dia e horário:**
+   - **Dias:** uma faixa de hoje até hoje + `max_advance_days`, no fuso do negócio. Cada dia é buscado quando é escolhido.
+   - **Horários:** agrupados em manhã, tarde e noite.
+   - **Dia vazio:** fechado, lotado ou fora da antecedência, mostra um estado vazio com um botão para o dia seguinte, e o "Continuar" some. No último dia aberto, a mensagem pede um dia anterior.
+   - **Um dia por vez:** o botão avança só um dia, de propósito, mesmo que o seguinte também esteja fechado (na demo, domingo leva à segunda). Procurar o próximo dia com horários exigiria buscar vários dias seguidos e gastaria o limite de 120 requisições por minuto da API.
+   - **Celular:** o botão "Continuar com HH:MM" fica fixo no rodapé, e os horários têm `scroll-margin` para não ficarem sob ele.
+4. **Seus dados:** nome, e-mail e telefone, validados ao sair do campo e no envio. O erro aparece abaixo de cada campo (`aria-describedby`), e o foco vai para o primeiro inválido.
+5. **Sucesso:**
+   - Mostra serviço, profissional (o atribuído, quando foi "qualquer"), dia e horário no fuso do negócio.
+   - O `access_url` aparece num campo só de leitura, com o botão de copiar. Sem a área de transferência, o link fica selecionado para a cópia manual.
+
+Cada passo tem o título com "N de M" ao lado e uma barra de progresso. Ao abrir um passo depois de uma escolha, o foco vai para o título. No desktop, o resumo fica fixo à direita; no celular, acima do passo. O aviso da RN29 aparece quando `is_demo` é verdadeiro (D48).
+
+### Respostas da API
+
+| Resposta | Comportamento |
+|---|---|
+| `404` no negócio | Página "Não encontramos este negócio", com links para o início e para a demo |
+| `409 SLOT_UNAVAILABLE` | Recarrega a disponibilidade, volta para os horários já atualizados e explica que o horário foi reservado. Os dados digitados ficam guardados |
+| `409 IDEMPOTENCY_KEY_REUSED` | Mensagem padrão e nova chave na próxima tentativa |
+| `422` com `customer.*` | Texto próprio no campo correspondente; as mensagens do Pydantic nunca aparecem |
+| `429` | Mensagem com o tempo de espera, e o botão fica em "Aguarde N s" até o `Retry-After` passar |
+| Falha de rede | Mensagem de conexão com "Tentar de novo", que reenvia o mesmo corpo com a mesma chave |
+| `email_status: "skipped"` | O link aparece com o aviso de que o e-mail não foi enviado e de que ele só está naquela tela (RN26) |
+| `email_status: "unchanged"` | Repetição de um agendamento já feito: `access_url` vem nulo, e a tela diz que o link foi para o e-mail (RN13) |
+
+### Idempotência (D64)
+
+Uma tentativa é um corpo exato. `useIdempotencyKey` guarda a chave e o corpo serializado da última tentativa:
+- **Mesmo corpo:** reaproveita a chave. Assim, um clique duplo ou um "Tentar de novo" depois de uma falha de rede nunca criam dois agendamentos.
+- **Corpo diferente:** gera uma nova chave com `crypto.randomUUID()`. Uma tentativa depois de um `409` ou de um `422` muda o corpo, então nunca cai em `IDEMPOTENCY_KEY_REUSED`.
+
+O envio também fica barrado enquanto a requisição anterior não termina. Quem barra é uma referência marcada no próprio clique, antes de o React redesenhar o botão.
+
+### Estado na URL (D65)
+
+`?servico=<id>&profissional=<id|qualquer>&dia=<AAAA-MM-DD>`.
+
+- **Histórico:** escolher serviço ou profissional cria uma entrada, então o "voltar" do celular volta um passo. Trocar de dia substitui a entrada.
+- **Horário:** vai no estado da entrada do histórico (`location.state`) e só vale se a disponibilidade atual ainda o oferece.
+- **Dados do cliente:** ficam só na memória, nunca na URL.
+- **Parâmetro inválido:** é ignorado, e o fluxo começa no primeiro passo que falta. Vale para serviço inexistente, inativo ou sem profissional, profissional que não atende o serviço e dia inválido ou fora da antecedência.
+
+### Telefone e moeda (D63)
+
+O telefone é convertido para E.164 antes do envio. Sem `+`, o número é brasileiro: DDD e número, com ou sem o 0 ou o 55 na frente, como `(11) 98765-4321` → `+5511987654321`. Com `+`, vale o código do país digitado. Os preços são formatados em reais (`src/lib/format.ts`).
+
+**Limitação conhecida:** a API não tem país nem moeda por negócio. Um negócio de outro país precisaria dos dois campos, para o telefone digitado sem `+` e para os preços.
+
 ## Datas e fusos (D56)
 
 As funções de `src/lib/datetime.ts` recebem sempre o fuso do negócio e nunca usam o do navegador: quem abre a página em Tóquio vê os horários de um negócio de São Paulo como o negócio os vê.
@@ -170,6 +236,9 @@ As funções de `src/lib/datetime.ts` recebem sempre o fuso do negócio e nunca 
 | `formatTimeRange` | `09:00–09:30`, ou com as datas quando o intervalo passa da meia-noite local |
 | `toLocalDate` | `2026-11-10`, o dia local do negócio |
 | `formatLocalDate` | `terça-feira, 10/11/2026`, para datas sem hora, como `date` da disponibilidade |
+| `formatLocalDayParts` | `{ weekday: 'ter', day: '10', month: 'nov' }`, para a faixa de dias |
+| `addLocalDays`, `localDateRange` e `isLocalDate` | Contas e validação de dias do calendário, sem fuso |
+| `localHour` | A hora (0 a 23) no fuso do negócio, para agrupar os horários por período |
 
 `parseInstant` aceita instantes com deslocamento, das rotas públicas, e em UTC, das de administração, e recusa uma string sem deslocamento, que o `Date` leria no fuso do navegador.
 
@@ -177,19 +246,19 @@ As funções de `src/lib/datetime.ts` recebem sempre o fuso do negócio e nunca 
 
 ```bash
 npm run test           # Vitest
-npm run test:coverage  # com cobertura; mínimo de 80% em src/lib e src/api
+npm run test:coverage  # com cobertura; mínimo de 80% em src/lib, src/api e src/features/booking
 npm run typecheck      # tsc -b
 npm run api:types      # regenera src/api/schema.d.ts
 ```
 
-- **Ambiente:** jsdom, com o processo em `TZ=Asia/Tokyo` (definido em `vite.config.ts`), para que qualquer uso do fuso do navegador apareça nos testes.
+- **Ambiente:** jsdom, com o processo em `TZ=Asia/Tokyo` (definido em `vite.config.ts`), para que qualquer uso do fuso do navegador apareça nos testes. O `setup.ts` substitui `matchMedia` e `ResizeObserver`, que o jsdom não tem. Os testes do agendamento fixam o relógio num instante em que o dia de São Paulo e o de Tóquio são diferentes, com `vi.useFakeTimers({ toFake: ['Date'] })`.
 - **API:** o MSW intercepta as requisições em `http://api.test`, o `VITE_API_BASE_URL` dos testes. Uma requisição sem handler faz o teste falhar. Cada teste troca as respostas com `server.use`.
-- **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; e o roteador.
+- **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; o roteador; preços e durações; e o agendamento público (negócio e slug inexistente, horários no fuso do negócio, dia sem horários, teclado, parâmetros inválidos, idempotência com clique duplo e falha de rede, `409`, `429`, `422`, limite de e-mail, repetição sem link e tela de sucesso).
 - **CI:** o job do frontend roda ESLint, `typecheck`, `test:coverage`, a conferência da D51 e o build.
 
 ## Uso dos MCPs (D58)
 
 - **shadcn:** consulte os componentes pelo MCP e instale com `npx shadcn add <nome>`. Eles ficam em `src/components/ui` e só mudam para traduzir textos, atender às regras de lint ou alcançar o contraste AA (como a variante `destructive` do botão e do selo).
-- **Magic:** só em componentes de destaque, como a seção principal de `/` e, nas próximas etapas, a escolha de horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion.
+- **Magic:** só em componentes de destaque: a seção principal de `/` e a escolha de dia e horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion. O `DateTimePicker` veio do "Time Slot Picker" (21st.dev, klyv-ui, id 43217), que não tem dependências. Manteve os dois grupos de rádio navegáveis pelo teclado e o fuso sempre impresso. Trocou as datas no fuso do navegador pelas de `src/lib/datetime.ts`, a carga de todos os dias pela de um dia por vez, as cores pelos tokens e os alvos para 44 px, e passou a agrupar os horários por período.
 - **chrome-devtools:** cada página nova ou alterada é conferida em 375 px e 1280 px, nos modos claro e escuro, sem rolagem horizontal, sem erros no console, com o contraste dos pares da tabela medido na página e o foco conferido pelo teclado.
 - **Arquivos de design system (D62):** nada de `design-system/`, `PRODUCT.md` ou `DESIGN.md` no repositório. A referência é `src/index.css` mais esta seção.
