@@ -58,6 +58,8 @@ services:
       VITE_USE_POLLING: "true"
       # D52: Vite forwards /api to the API, so both stay on the same origin.
       VITE_API_PROXY_TARGET: ${VITE_API_PROXY_TARGET:-http://api:8000}
+      # D75: public, in the JavaScript of the browser. Only the demo password.
+      VITE_DEMO_PASSWORD: ${VITE_DEMO_PASSWORD:-${DEMO_PASSWORD:-}}
     ports:
       - "5174:5174"
     volumes:

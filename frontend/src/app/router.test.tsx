@@ -3,6 +3,8 @@ import { createMemoryRouter, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it, vi } from 'vitest'
 
+import { withOpenSession } from '@/test/session'
+
 import { Providers } from './providers'
 import { PATHS, routes } from './router'
 
@@ -73,6 +75,7 @@ describe('router (D54)', () => {
     ['/painel/bloqueios', 'Bloqueios'],
     ['/painel/negocio', 'Negócio'],
   ])('has the panel page %s with the side menu', async (path, title) => {
+    await withOpenSession('owner')
     renderAt(path)
 
     expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument()

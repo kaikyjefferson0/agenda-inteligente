@@ -43,6 +43,7 @@ export default defineConfig(({ mode }) => {
       env: {
         TZ: 'Asia/Tokyo',
         VITE_API_BASE_URL: 'http://api.test',
+        VITE_DEMO_PASSWORD: 'senha-da-demo-de-teste',
       },
       coverage: {
         provider: 'v8',
@@ -54,6 +55,7 @@ export default defineConfig(({ mode }) => {
           'src/lib/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
           'src/api/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
           'src/features/scheduling/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+          'src/features/auth/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
           'src/features/booking/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
           'src/features/customer-appointment/**': {
             statements: 80,

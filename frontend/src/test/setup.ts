@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 
 import { cleanup } from '@testing-library/react'
-import { afterAll, afterEach, beforeAll, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 
 import { server } from './msw/server'
 
@@ -40,3 +40,14 @@ afterEach(() => {
   server.resetHandlers()
 })
 afterAll(() => server.close())
+
+// Each test starts with no session: a fresh one with memory lock, channel and hint.
+// The demo accounts (D75) are on in the tests, and some turn them off.
+beforeEach(async () => {
+  const { replaceAppSession } = await import('@/features/auth')
+  const { localLock, silentChannel } = await import('@/features/auth/session/tab-sync')
+  const { memoryHint } = await import('@/features/auth/session/session-hint')
+  const { authApi } = await import('./msw/auth')
+  authApi.reset()
+  replaceAppSession({ lock: localLock(), channel: silentChannel(), hint: memoryHint(), askTimeoutMs: 5 })
+})

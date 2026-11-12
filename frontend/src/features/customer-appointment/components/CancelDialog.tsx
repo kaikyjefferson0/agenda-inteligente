@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { useRetryAfter } from '@/features/scheduling'
+import { useRetryAfter } from '@/hooks/use-retry-after'
 import { formatDateTime } from '@/lib/datetime'
 
 import { isFinalRefusal, type Outcome } from '../outcome'
@@ -137,7 +137,7 @@ export function CancelDialog({ token, appointment, onSettled }: CancelDialogProp
                 Cancelando…
               </>
             ) : retry.waiting ? (
-              `Aguarde ${retry.wait} s`
+              retry.label
             ) : (
               <>
                 <CalendarXIcon aria-hidden="true" className="size-5" />

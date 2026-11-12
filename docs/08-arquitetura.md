@@ -66,9 +66,9 @@ Uma função pura recebe a configuração, os intervalos de expediente, os perí
 
 Vite, React, TypeScript, Tailwind, shadcn/ui, React Router, TanStack Query, React Hook Form e Zod. Os tipos da API são gerados a partir do OpenAPI. Estrutura, rotas, cliente da API, identidade visual e testes estão em [Frontend](09-frontend.md).
 
-O token de acesso fica somente em memória. Ao recarregar a página, o frontend chama `/auth/refresh`.
+O token de acesso fica somente em memória. Ao recarregar a página, o frontend renova a sessão uma vez, em silêncio, se o `localStorage` indicar que pode haver uma (D71).
 
-**A renovação precisa ser única entre abas.** O refresh tem rotação sem tolerância: duas chamadas simultâneas com o mesmo cookie, como ao recarregar duas abas, são tratadas como reuso e revogam a família, o que encerra a sessão. A fase do frontend deve serializar `/auth/refresh` entre abas, por exemplo com a Web Locks API, e reler o resultado obtido pela aba que renovou. Esse requisito é obrigatório para a fase do frontend, porque a API não consegue distinguir essa corrida de um roubo de token.
+**A renovação precisa ser única entre abas.** O refresh tem rotação sem tolerância: duas chamadas simultâneas com o mesmo cookie, como ao recarregar duas abas, são tratadas como reuso e revogam a família, o que encerra a sessão. A fase do frontend deve serializar `/auth/refresh` entre abas, por exemplo com a Web Locks API, e reler o resultado obtido pela aba que renovou. Esse requisito é obrigatório, porque a API não consegue distinguir essa corrida de um roubo de token. O frontend o atende com a Web Locks API e um `BroadcastChannel` (D70), descritos em [Frontend](09-frontend.md#sessão-d70-a-d73).
 
 ## Fluxos críticos
 
@@ -197,6 +197,7 @@ Variáveis principais:
 | `FRONTEND_BASE_URL` | Base dos links enviados por e-mail |
 | `TRUSTED_CLIENT_IP_HEADER` | Cabeçalho com o IP do cliente, definido pelo proxy da hospedagem; vazio sem proxy |
 | `DEMO_PASSWORD` | Senha das contas da demo, de 12 a 128 caracteres; opcional para a API e obrigatória para a restauração da demo |
+| `VITE_DEMO_PASSWORD` | Build do frontend: senha do atalho da demonstração em `/entrar` (D75). Pública, como toda variável `VITE_`; só a senha da demo, nunca a de uma conta real. Vazia, o atalho some |
 
 ## CI (GitHub Actions)
 

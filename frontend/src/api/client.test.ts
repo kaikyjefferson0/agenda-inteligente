@@ -4,7 +4,15 @@ import { afterEach, describe, expect, expectTypeOf, it } from 'vitest'
 import { server } from '@/test/msw/server'
 import { API, demoBusiness, problem } from '@/test/msw/handlers'
 
-import { api, createApiClient, REQUESTED_WITH, setAccessTokenProvider, unwrap } from './client'
+import {
+  api,
+  createApiClient,
+  REQUESTED_WITH,
+  sendsAccessToken,
+  setAccessTokenProvider,
+  setUnauthorizedHandler,
+  unwrap,
+} from './client'
 import { ApiError, NetworkError, parseRetryAfter } from './errors'
 import type { components } from './schema'
 
@@ -220,25 +228,134 @@ describe('headers', () => {
     expect(seen['/auth/login'].has('X-Requested-With')).toBe(false)
   })
 
+  function recordMe() {
+    return http.get(`${API}/auth/me`, ({ request }) => {
+      seen['/auth/me'] = request.headers
+      return HttpResponse.json({})
+    })
+  }
+
   it('sends the access token from the provider, and nothing without one', async () => {
     let token: string | null = null
     const withSession = createApiClient({ baseUrl: 'http://api.test', getAccessToken: () => token })
-    server.use(record('/auth/login'))
+    server.use(recordMe())
 
-    await withSession.POST('/api/v1/auth/login', { body: { email: 'a@example.com', password: 'x' } })
-    expect(seen['/auth/login'].has('Authorization')).toBe(false)
+    await withSession.GET('/api/v1/auth/me')
+    expect(seen['/auth/me'].has('Authorization')).toBe(false)
 
     token = 'abc'
-    await withSession.POST('/api/v1/auth/login', { body: { email: 'a@example.com', password: 'x' } })
-    expect(seen['/auth/login'].get('Authorization')).toBe('Bearer abc')
+    await withSession.GET('/api/v1/auth/me')
+    expect(seen['/auth/me'].get('Authorization')).toBe('Bearer abc')
   })
 
-  it('lets the login step plug the session into the default client', async () => {
-    server.use(record('/auth/logout'))
+  it('waits for an asynchronous provider (D72)', async () => {
+    const withSession = createApiClient({
+      baseUrl: 'http://api.test',
+      getAccessToken: () => Promise.resolve('renovado'),
+    })
+    server.use(recordMe())
+
+    await withSession.GET('/api/v1/auth/me')
+
+    expect(seen['/auth/me'].get('Authorization')).toBe('Bearer renovado')
+  })
+
+  it('never asks for the token on the public and account routes', async () => {
+    let asked = 0
+    const withSession = createApiClient({
+      baseUrl: 'http://api.test',
+      getAccessToken: () => {
+        asked += 1
+        return 'abc'
+      },
+    })
+    server.use(record('/auth/refresh'), record('/auth/logout'), record('/auth/login'))
+
+    await withSession.POST('/api/v1/auth/refresh')
+    await withSession.POST('/api/v1/auth/logout')
+    await withSession.POST('/api/v1/auth/login', { body: { email: 'a@example.com', password: 'x' } })
+    await withSession.GET('/api/v1/public/businesses/{slug}', { params: { path: { slug: 'barbearia-demo' } } })
+
+    expect(asked).toBe(0)
+    expect(seen['/auth/refresh'].has('Authorization')).toBe(false)
+    expect(sendsAccessToken('/api/v1/auth/me')).toBe(true)
+    expect(sendsAccessToken('/api/v1/business')).toBe(true)
+  })
+
+  it('lets the session plug into the default client', async () => {
+    server.use(recordMe())
     setAccessTokenProvider(() => 'token-da-sessao')
 
-    await api.POST('/api/v1/auth/logout')
+    await api.GET('/api/v1/auth/me')
 
-    expect(seen['/auth/logout'].get('Authorization')).toBe('Bearer token-da-sessao')
+    expect(seen['/auth/me'].get('Authorization')).toBe('Bearer token-da-sessao')
+  })
+})
+
+describe('401 with a token (D72)', () => {
+  afterEach(() => {
+    setAccessTokenProvider(() => null)
+    setUnauthorizedHandler(() => Promise.resolve(null))
+  })
+
+  function meWith(validToken: string) {
+    const seen: string[] = []
+    server.use(
+      http.patch(`${API}/business`, async ({ request }) => {
+        seen.push(`${request.headers.get('Authorization')} ${JSON.stringify(await request.json())}`)
+        return request.headers.get('Authorization') === `Bearer ${validToken}`
+          ? HttpResponse.json({ ok: true })
+          : problem(401, 'NOT_AUTHENTICATED')
+      }),
+    )
+    return seen
+  }
+
+  it('renews once and retries the same request', async () => {
+    const seen = meWith('novo')
+    let renewals = 0
+    setAccessTokenProvider(() => 'velho')
+    setUnauthorizedHandler(() => {
+      renewals += 1
+      return Promise.resolve('novo')
+    })
+
+    await api.PATCH('/api/v1/business', { body: { name: 'Outro nome' } })
+
+    expect(renewals).toBe(1)
+    expect(seen).toEqual(['Bearer velho {"name":"Outro nome"}', 'Bearer novo {"name":"Outro nome"}'])
+  })
+
+  it('throws the 401 when the session is over', async () => {
+    meWith('novo')
+    setAccessTokenProvider(() => 'velho')
+
+    const error = await caught(api.PATCH('/api/v1/business', { body: { name: 'X' } }))
+
+    expect(error).toBeInstanceOf(ApiError)
+    expect((error as ApiError).code).toBe('NOT_AUTHENTICATED')
+  })
+
+  it('throws the error of the retry when it also fails', async () => {
+    meWith('outro')
+    setAccessTokenProvider(() => 'velho')
+    setUnauthorizedHandler(() => Promise.resolve('novo'))
+
+    const error = await caught(api.PATCH('/api/v1/business', { body: { name: 'X' } }))
+
+    expect((error as ApiError).status).toBe(401)
+  })
+
+  it('does not retry a request sent without a token', async () => {
+    let renewals = 0
+    setUnauthorizedHandler(() => {
+      renewals += 1
+      return Promise.resolve('novo')
+    })
+    meWith('novo')
+
+    await caught(api.PATCH('/api/v1/business', { body: { name: 'X' } }))
+
+    expect(renewals).toBe(0)
   })
 })

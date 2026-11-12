@@ -1,7 +1,13 @@
 // Panel group (D54): loaded on demand as one chunk, together with its layout.
+import { PanelLayout } from '@/components/layout/PanelLayout'
 import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
+import { RequireOwner, usePanelAccount } from '@/features/auth'
 
-export { PanelLayout } from '@/components/layout/PanelLayout'
+/** The panel with who is in and the logout (UC02). */
+export function ProtectedPanelLayout() {
+  const { account, logout, loggingOut } = usePanelAccount()
+  return <PanelLayout account={account} onLogout={logout} loggingOut={loggingOut} />
+}
 
 export function AgendaPage() {
   return (
@@ -14,19 +20,23 @@ export function AgendaPage() {
 
 export function ServicesPage() {
   return (
-    <PlaceholderPage
-      title="Serviços"
-      description="Aqui o Dono vai criar, editar e desativar serviços, com duração, preparo e preço."
-    />
+    <RequireOwner>
+      <PlaceholderPage
+        title="Serviços"
+        description="Aqui o Dono vai criar, editar e desativar serviços, com duração, preparo e preço."
+      />
+    </RequireOwner>
   )
 }
 
 export function TeamPage() {
   return (
-    <PlaceholderPage
-      title="Equipe"
-      description="Aqui o Dono vai convidar e desativar profissionais e escolher os serviços de cada um."
-    />
+    <RequireOwner>
+      <PlaceholderPage
+        title="Equipe"
+        description="Aqui o Dono vai convidar e desativar profissionais e escolher os serviços de cada um."
+      />
+    </RequireOwner>
   )
 }
 
@@ -50,9 +60,11 @@ export function TimeBlocksPage() {
 
 export function BusinessSettingsPage() {
   return (
-    <PlaceholderPage
-      title="Negócio"
-      description="Aqui o Dono vai alterar nome, endereço, fuso, passo da grade, antecedência e prazo de alteração."
-    />
+    <RequireOwner>
+      <PlaceholderPage
+        title="Negócio"
+        description="Aqui o Dono vai alterar nome, endereço, fuso, passo da grade, antecedência e prazo de alteração."
+      />
+    </RequireOwner>
   )
 }

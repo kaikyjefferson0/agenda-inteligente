@@ -15,9 +15,9 @@ import {
   ChoiceList,
   DateTimePicker,
   schedulingKeys,
-  useRetryAfter,
   type PublicBusiness,
 } from '@/features/scheduling'
+import { useRetryAfter } from '@/hooks/use-retry-after'
 import { formatLocalDate, formatTime, toLocalDate } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
 
@@ -240,7 +240,7 @@ function RescheduleChoices({
                 Remarcando…
               </>
             ) : retry.waiting ? (
-              `Aguarde ${retry.wait} s`
+              retry.label
             ) : offered && picked !== null ? (
               `Remarcar para ${formatTime(picked, timeZone)}`
             ) : (
