@@ -1,9 +1,11 @@
 import { useState } from 'react'
 
-import type { PublicProfessional } from '../queries'
-import { ANY_PROFESSIONAL } from '../use-booking-flow'
-import { ChoiceList } from './ChoiceList'
-import { ContinueButton } from './ContinueButton'
+import {
+  ANY_PROFESSIONAL,
+  ChoiceList,
+  ContinueButton,
+  type PublicProfessional,
+} from '@/features/scheduling'
 
 interface ProfessionalStepProps {
   professionals: PublicProfessional[]

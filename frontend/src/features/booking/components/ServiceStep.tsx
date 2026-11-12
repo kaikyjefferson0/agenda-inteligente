@@ -2,10 +2,13 @@ import { useState } from 'react'
 
 import { formatDuration, formatPrice } from '@/lib/format'
 
-import type { PublicBusiness, PublicService } from '../queries'
-import { isBookable } from '../use-booking-flow'
-import { ChoiceList } from './ChoiceList'
-import { ContinueButton } from './ContinueButton'
+import {
+  ChoiceList,
+  ContinueButton,
+  isBookable,
+  type PublicBusiness,
+  type PublicService,
+} from '@/features/scheduling'
 
 interface ServiceStepProps {
   business: PublicBusiness

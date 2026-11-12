@@ -2,7 +2,7 @@ import { InfoIcon } from 'lucide-react'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
-import type { PublicBusiness } from '../queries'
+import type { PublicBusiness } from '@/features/scheduling'
 
 /** Name of the business and, on the demo, the notice of the nightly restore (RN29, D48). */
 export function BusinessHeader({ business }: { business: PublicBusiness }) {

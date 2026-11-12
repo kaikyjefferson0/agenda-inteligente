@@ -7,14 +7,20 @@ import { formatLocalDate, formatTime, toLocalDate } from '@/lib/datetime'
 
 import { EMPTY_CUSTOMER, type CustomerInput } from '../customer-schema'
 import { useIdempotencyKey } from '../idempotency'
-import { availabilityQuery, bookingKeys, type Booking, type PublicBusiness } from '../queries'
+import {
+  availabilityQuery,
+  ContinueButton,
+  DateTimePicker,
+  schedulingKeys,
+  type PublicBusiness,
+} from '@/features/scheduling'
+
+import type { Booking } from '../queries'
 import { currentStep, stepsOf, useBookingFlow, type Step } from '../use-booking-flow'
 import { BookingSuccess } from './BookingSuccess'
 import { BookingSummary } from './BookingSummary'
 import { BusinessHeader } from './BusinessHeader'
-import { ContinueButton } from './ContinueButton'
 import { CustomerStep } from './CustomerStep'
-import { DateTimePicker } from './DateTimePicker'
 import { ProfessionalStep } from './ProfessionalStep'
 import { ServiceStep } from './ServiceStep'
 import { StepSection } from './StepSection'
@@ -68,7 +74,7 @@ export function BookingFlow({ business }: { business: PublicBusiness }) {
     setTaken(slot)
     setPicked(null)
     // Waits for the new list, then goes back to it (UC11, 409).
-    await queryClient.invalidateQueries({ queryKey: bookingKeys.availabilityOf(business.slug) })
+    await queryClient.invalidateQueries({ queryKey: schedulingKeys.availabilityOf(business.slug) })
     flow.clearSlot()
   }, [slot, queryClient, business.slug, flow])
 

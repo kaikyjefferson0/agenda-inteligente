@@ -8,6 +8,9 @@ export const API = 'http://api.test/api/v1'
 type PublicBusiness = components['schemas']['PublicBusinessResponse']
 type Booking = components['schemas']['BookingResponse']
 type CreateBooking = components['schemas']['CreateBookingRequest']
+type CustomerAppointment = components['schemas']['CustomerAppointmentResponse']
+type CustomerChange = components['schemas']['CustomerChangeResponse']
+type Reschedule = components['schemas']['RescheduleRequest']
 
 export const PROFESSIONAL_ID = '5d0c7e42-0000-4000-8000-000000000002'
 export const OWNER_ID = '5d0c7e42-0000-4000-8000-000000000003'
@@ -80,6 +83,56 @@ export function bookingFor(body: CreateBooking, overrides: Partial<Booking> = {}
   }
 }
 
+/** The token of the customer link that the default handlers know. */
+export const LINK_TOKEN = 'token-de-teste'
+
+/**
+ * `GET /public/appointments/{token}`: "Corte e barba" with Profissional Demo,
+ * Thursday 12/11/2026 at 10:00 in São Paulo, changeable until 08:00 (RN17).
+ */
+export function linkAppointment(overrides: Partial<CustomerAppointment> = {}): CustomerAppointment {
+  const service = demoBusiness.services.find((item) => item.id === TEAM_SERVICE_ID)!
+  return {
+    id: 'a1b2c3d4-0000-4000-8000-000000000001',
+    status: 'confirmed',
+    starts_at: '2026-11-12T10:00:00-03:00',
+    ends_at: '2026-11-12T11:30:00-03:00',
+    business: { name: demoBusiness.name, slug: demoBusiness.slug, timezone: demoBusiness.timezone },
+    service: {
+      id: service.id,
+      name: service.name,
+      duration_minutes: service.duration_minutes,
+      price_cents: service.price_cents,
+    },
+    professional: { id: PROFESSIONAL_ID, name: 'Profissional Demo' },
+    can_cancel: true,
+    can_reschedule: true,
+    change_deadline_at: '2026-11-12T08:00:00-03:00',
+    ...overrides,
+  }
+}
+
+/** What the reschedule answers for `body`, from `appointment`. */
+export function rescheduledFrom(
+  appointment: CustomerAppointment,
+  body: Reschedule,
+  overrides: Partial<CustomerChange> = {},
+): CustomerChange {
+  const professionalId = body.professional_id ?? appointment.professional.id
+  const professional = demoBusiness.professionals.find((item) => item.id === professionalId)!
+  const start = Date.parse(body.starts_at)
+  const ends = new Date(start + appointment.service.duration_minutes * MINUTE)
+  return {
+    ...appointment,
+    starts_at: body.starts_at,
+    ends_at: ends.toISOString(),
+    professional,
+    change_deadline_at: new Date(start - 2 * 60 * MINUTE).toISOString(),
+    email_status: 'queued',
+    ...overrides,
+  }
+}
+
 /** A problem+json response, as `app/api/errors.py` builds it. */
 export function problem(
   status: number,
@@ -113,5 +166,21 @@ export const handlers = [
   }),
   http.post(`${API}/public/businesses/:slug/appointments`, async ({ request }) =>
     HttpResponse.json(bookingFor((await request.json()) as CreateBooking), { status: 201 }),
+  ),
+  http.get(`${API}/public/appointments/:token`, ({ params }) =>
+    params.token === LINK_TOKEN ? HttpResponse.json(linkAppointment()) : problem(404, 'NOT_FOUND'),
+  ),
+  http.post(`${API}/public/appointments/:token/cancel`, ({ params }) =>
+    params.token === LINK_TOKEN
+      ? HttpResponse.json({
+          ...linkAppointment({ status: 'cancelled', can_cancel: false, can_reschedule: false }),
+          email_status: 'queued',
+        })
+      : problem(404, 'NOT_FOUND'),
+  ),
+  http.post(`${API}/public/appointments/:token/reschedule`, async ({ params, request }) =>
+    params.token === LINK_TOKEN
+      ? HttpResponse.json(rescheduledFrom(linkAppointment(), (await request.json()) as Reschedule))
+      : problem(404, 'NOT_FOUND'),
   ),
 ]

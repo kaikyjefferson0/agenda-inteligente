@@ -18,7 +18,7 @@ import {
 } from '../customer-schema'
 import { useIdempotencyKey } from '../idempotency'
 import { useCreateBooking, type Booking, type CreateBookingBody } from '../queries'
-import { ContinueButton } from './ContinueButton'
+import { ContinueButton, useRetryAfter } from '@/features/scheduling'
 
 interface CustomerStepProps {
   slug: string
@@ -61,16 +61,6 @@ const FIELDS: {
   },
 ]
 
-/** The moment `seconds` from now, as from `Retry-After`. */
-function deadlineIn(seconds: number): number {
-  return Date.now() + seconds * 1000
-}
-
-/** Seconds left until `until`, rounded up; 0 once it passed. */
-function secondsLeft(until: number | null): number {
-  return until === null ? 0 : Math.max(0, Math.ceil((until - Date.now()) / 1000))
-}
-
 export function CustomerStep({
   slug,
   serviceId,
@@ -89,27 +79,13 @@ export function CustomerStep({
   })
   const mutation = useCreateBooking(slug)
   const [failure, setFailure] = useState<unknown>(null)
-  const [waitUntil, setWaitUntil] = useState<number | null>(null)
-  const [wait, setWait] = useState(0)
+  const { wait, waiting, holdFor, holding } = useRetryAfter()
   const formRef = useRef<HTMLFormElement>(null)
   // Set synchronously on submit: a double click never sends twice (D64).
   const sending = useRef(false)
 
   // Keeps what was typed when the step closes (e.g. back to the slots after a 409).
   useEffect(() => () => onDraftChange(form.getValues()), [form, onDraftChange])
-
-  // 429: counts down the `Retry-After` and holds the button until it ends.
-  useEffect(() => {
-    if (waitUntil === null) return
-    const tick = () => {
-      const left = secondsLeft(waitUntil)
-      setWait(left)
-      if (left === 0) setWaitUntil(null)
-    }
-    tick()
-    const timer = window.setInterval(tick, 1000)
-    return () => window.clearInterval(timer)
-  }, [waitUntil])
 
   const submit = form.handleSubmit(async (values) => {
     const body: CreateBookingBody = {
@@ -128,9 +104,8 @@ export function CustomerStep({
         return
       }
       if (error instanceof ApiError && error.code === 'IDEMPOTENCY_KEY_REUSED') idempotency.reset()
-      if (error instanceof ApiError && error.status === 429 && error.retryAfterSeconds !== null) {
-        setWaitUntil(deadlineIn(error.retryAfterSeconds))
-      }
+      // 429: holds the button until the `Retry-After` ends.
+      holdFor(error)
       let mapped = false
       if (error instanceof ApiError) {
         for (const item of error.fieldErrors) {
@@ -146,7 +121,7 @@ export function CustomerStep({
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (sending.current || secondsLeft(waitUntil) > 0) return
+    if (sending.current || holding()) return
     sending.current = true
     void submit(event).finally(() => {
       sending.current = false
@@ -154,7 +129,6 @@ export function CustomerStep({
   }
 
   const busy = mutation.isPending
-  const waiting = wait > 0
 
   return (
     <form ref={formRef} noValidate onSubmit={onSubmit} className="flex flex-col gap-6">

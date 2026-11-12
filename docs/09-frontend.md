@@ -1,6 +1,6 @@
 # 9. Frontend
 
-SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D65 dos [Pontos a revisar](README.md#pontos-a-revisar).
+SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D69 dos [Pontos a revisar](README.md#pontos-a-revisar).
 
 ## Estrutura de pastas
 
@@ -16,14 +16,16 @@ frontend/src/
 │   ├── feedback/ # ErrorMessage, PageLoader e RouteError
 │   └── marketing/# Seção principal da página inicial (Magic, D58)
 ├── features/
-│   └── booking/  # Agendamento público (UC10 e UC11): componentes, consultas e formulário
+│   ├── scheduling/          # Compartilhado (D66): negócio, disponibilidade, dia e horário
+│   ├── booking/             # Agendamento público (UC10 e UC11): passos, formulário e sucesso
+│   └── customer-appointment/# Link do cliente (UC12 a UC14): consulta, cancelamento e remarcação
 ├── hooks/        # Hooks compartilhados, como o use-mobile do sidebar
 ├── lib/          # Funções puras: datas e fusos, esquema de cores, prévia da demo e utilitários
 ├── pages/        # Páginas por grupo de rotas: public/, account/, panel/ e a 404
 └── test/         # Configuração do Vitest e servidor do MSW com os handlers
 ```
 
-Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam agrupadas por grupo de rotas, e não em uma lista plana, porque cada grupo é um módulo carregado sob demanda (D54). `features/` reúne, por funcionalidade, os componentes, as consultas do TanStack Query e os formulários; as páginas apenas os compõem.
+Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam agrupadas por grupo de rotas, e não em uma lista plana, porque cada grupo é um módulo carregado sob demanda (D54). `features/` reúne, por funcionalidade, os componentes, as consultas do TanStack Query e os formulários; as páginas apenas os compõem. Uma funcionalidade nunca importa de outra: o que duas usam fica em `scheduling` (D66).
 
 ## Rotas (D54)
 
@@ -40,7 +42,7 @@ Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam a
 | `/painel/servicos`, `/equipe`, `/expediente`, `/bloqueios`, `/negocio` | Configuração | Painel |
 | Qualquer outra | Página não encontrada | Principal |
 
-- `/`, `/n/:slug` e a 404 são definitivas. As demais são provisórias, com o título e uma frase do que virá.
+- `/`, `/n/:slug`, `/agendamento/:token` e a 404 são definitivas. As demais são provisórias, com o título e uma frase do que virá.
 - Cada grupo (público, conta e painel) é um módulo importado com `lazy`, que o Vite separa em um arquivo próprio. O layout público e a 404 ficam no arquivo principal.
 - Cada grupo tem um `errorElement` (`RouteError`), então um erro no painel não derruba as páginas públicas. Uma falha ao baixar o módulo, comum logo depois de um deploy, se resolve recarregando a página.
 - As páginas abertas por um link com token (`/agendamento`, `/convite` e `/recuperar-senha`) declaram `<meta name="referrer" content="no-referrer">`, para o token não sair no cabeçalho `Referer`.
@@ -146,7 +148,7 @@ Contraste medido na página renderizada, com o chrome-devtools:
 ### Foco e acessibilidade (D61)
 
 - **Foco:** todo `:focus-visible` recebe contorno sólido de 2 px em `--ring`, deslocado 2 px. A regra fica fora das camadas do Tailwind, então vence o `outline-none` dos componentes do shadcn; o halo deles continua como enfeite. O deslocamento faz o anel ser medido contra o fundo da página, e não contra o vinho do botão.
-- **Diálogos:** o contêiner que o Radix foca ao abrir um diálogo (`role="dialog"` com `tabindex="-1"`) não recebe o contorno, porque não é um controle.
+- **Diálogos:** o contêiner que o Radix foca ao abrir um diálogo (`role="dialog"` ou `role="alertdialog"`, com `tabindex="-1"`) não recebe o contorno, porque não é um controle.
 - **Gaveta do painel:** fecha com Esc, tocando fora ou escolhendo um item, como no shadcn. O Radix só devolve o foco a um `SheetTrigger`, e o Sidebar abre a gaveta com um botão comum; por isso o botão "Menu" retoma o foco ao fechar, assim que o Radix tira o `aria-hidden` do resto da página.
 - **Toque:** alvos de pelo menos 44 px nas páginas públicas e no painel abaixo de 768 px (cabeçalho, botão "Menu" com rótulo e itens da gaveta). A partir de 768 px, o menu lateral volta à densidade do shadcn.
 - `lang="pt-BR"`, link "Pular para o conteúdo" em cada layout e textos de leitores de tela traduzidos nos componentes do shadcn.
@@ -160,15 +162,19 @@ Contraste medido na página renderizada, com o chrome-devtools:
 
 ## Agendamento público (UC10 e UC11)
 
-`/n/:slug` mostra o negócio (`GET /public/businesses/{slug}`) e o fluxo de agendamento. O código fica em `src/features/booking`; a página (`src/pages/public/BusinessPage.tsx`) só escolhe entre carregando, não encontrado, erro e o fluxo.
+`/n/:slug` mostra o negócio (`GET /public/businesses/{slug}`) e o fluxo de agendamento. O código fica em `src/features/booking`, mais o compartilhado de `src/features/scheduling` (D66); a página (`src/pages/public/BusinessPage.tsx`) só escolhe entre carregando, não encontrado, erro e o fluxo.
 
 | Arquivo | Conteúdo |
 |---|---|
-| `queries.ts` | `businessQuery`, `availabilityQuery` e `useCreateBooking`, com as chaves `['public', 'business', slug, ...]` |
+| `scheduling/queries.ts` | `businessQuery` e `availabilityQuery`, com as chaves `['public', 'business', slug, ...]` |
+| `scheduling/professionals.ts` | Profissionais aptos (RN07) e o valor de "qualquer profissional" |
+| `scheduling/use-retry-after.ts` | Espera do `Retry-After` depois de um `429` |
+| `scheduling/components/` | `DateTimePicker`, `ChoiceList` e `ContinueButton` |
+| `queries.ts` | `useCreateBooking` |
 | `use-booking-flow.ts` | Estado do fluxo a partir da URL e do histórico (D65) |
 | `idempotency.ts` | Chave de idempotência por tentativa (D64) |
 | `customer-schema.ts` | Esquema zod dos dados do cliente, textos em português e conversão para E.164 (D63) |
-| `components/` | Passos, escolha de dia e horário, resumo, tela de sucesso e página de não encontrado |
+| `components/` | Passos, resumo, tela de sucesso e página de não encontrado |
 
 ### Passos
 
@@ -223,6 +229,52 @@ O telefone é convertido para E.164 antes do envio. Sem `+`, o número é brasil
 
 **Limitação conhecida:** a API não tem país nem moeda por negócio. Um negócio de outro país precisaria dos dois campos, para o telefone digitado sem `+` e para os preços.
 
+## Link do cliente (UC12 a UC14)
+
+`/agendamento/:token` lê o link (`GET /public/appointments/{token}`) e, dentro do prazo, cancela ou remarca. O código fica em `src/features/customer-appointment`; a página (`src/pages/public/CustomerAppointmentPage.tsx`) só escolhe entre carregando, link inválido, erro e o agendamento, e declara `no-referrer` em todos esses estados.
+
+| Arquivo | Conteúdo |
+|---|---|
+| `queries.ts` | `appointmentQuery`, `useCancelAppointment` e `useRescheduleAppointment`. A chave é `['public', 'appointment', token]`; uma mudança grava a resposta nela e invalida a disponibilidade do negócio |
+| `reschedule.ts` | Profissional e dia iniciais da remarcação (D68) |
+| `outcome.ts` | O aviso depois de uma mudança e as recusas definitivas (D67) |
+| `components/` | Página do agendamento, selo da situação, detalhes, diálogo de cancelamento, remarcação e link inválido |
+
+### Estados (D69)
+
+| Situação | O que aparece |
+|---|---|
+| Confirmado, dentro do prazo | "Você pode remarcar ou cancelar até {prazo}", com "Remarcar" e "Cancelar agendamento". Com o serviço fora da página pública (`can_reschedule` falso), só o cancelamento, com o motivo |
+| Confirmado, fora do prazo | Aviso "O prazo para alterar pelo link terminou", com "fale com {negócio}" e o link para a página pública |
+| Cancelado ou concluído | A situação e o link discreto "Fazer novo agendamento em {negócio}" |
+| Não compareceu | Só a situação, sem link |
+| `404` | "Este link não abre mais o agendamento", igual para link inexistente, trocado ou expirado (D18) |
+| Falha de rede ou `5xx` | Mensagem com "Tentar de novo" |
+
+A situação aparece num selo com ícone e texto, nunca só pela cor. O prazo e os horários estão sempre no fuso do negócio (D56), e a data não quebra no meio de "sexta-feira".
+
+**Limitação conhecida:** a API não tem contato do negócio. O link cita só o nome e leva à página pública; mostrar telefone, endereço ou e-mail exigiria esses campos no negócio e na resposta do link.
+
+### Cancelamento (D67)
+
+1. "Cancelar agendamento" abre um `AlertDialog` com serviço, profissional, dia e horário. O foco começa em "Manter agendamento", então um Enter distraído não cancela.
+2. Esc ou "Manter agendamento" fecham sem requisição, e o Radix devolve o foco ao botão que abriu. O Tab fica preso dentro do diálogo.
+3. Confirmar envia uma vez só, mesmo com clique duplo, e o diálogo não fecha até a resposta.
+4. A resposta decide o resto:
+   - **Sucesso:** a página mostra "Cancelado" na hora, e o foco vai para o aviso "Agendamento cancelado", porque o botão que abriu o diálogo sumiu.
+   - **Rede, `5xx` ou `429`:** a mensagem aparece dentro do diálogo, que continua aberto para tentar de novo; no `429`, o botão fica em "Aguarde N s".
+   - **`404`, `CHANGE_DEADLINE_PASSED` ou `INVALID_STATUS_TRANSITION`:** o diálogo fecha, o link é lido de novo, e um aviso explica a recusa.
+
+### Remarcação (D68)
+
+- Abre na própria página, abaixo do "Horário atual", e busca a página pública do negócio nesse momento, para os profissionais e a faixa de dias.
+- **Profissional:** com mais de um apto, a escolha começa no atual, se ele ainda atende o serviço; senão, em "Qualquer profissional", enviado como `professional_id: null` (RN10). Trocar de profissional limpa o horário escolhido.
+- **Dia:** começa no do agendamento atual, se ainda estiver na faixa de reserva; senão, hoje.
+- **Horários:** os da disponibilidade pública, sem filtro. Ela já conta o agendamento como ocupado para o profissional dele, como a remarcação na API, então um horário sobre o atual só aparece com outro profissional.
+- **`409 SLOT_UNAVAILABLE`:** recarrega os horários e avisa que o agendamento continua no horário atual.
+- **Celular:** só "Remarcar para HH:MM" fica fixo no rodapé; "Manter o horário atual" vem logo abaixo e fecha a remarcação, devolvendo o foco a "Remarcar".
+- As escolhas ficam só na memória: a remarcação não muda a URL.
+
 ## Datas e fusos (D56)
 
 As funções de `src/lib/datetime.ts` recebem sempre o fuso do negócio e nunca usam o do navegador: quem abre a página em Tóquio vê os horários de um negócio de São Paulo como o negócio os vê.
@@ -246,19 +298,19 @@ As funções de `src/lib/datetime.ts` recebem sempre o fuso do negócio e nunca 
 
 ```bash
 npm run test           # Vitest
-npm run test:coverage  # com cobertura; mínimo de 80% em src/lib, src/api e src/features/booking
+npm run test:coverage  # com cobertura; mínimo de 80% em src/lib, src/api e em cada pasta de src/features
 npm run typecheck      # tsc -b
 npm run api:types      # regenera src/api/schema.d.ts
 ```
 
 - **Ambiente:** jsdom, com o processo em `TZ=Asia/Tokyo` (definido em `vite.config.ts`), para que qualquer uso do fuso do navegador apareça nos testes. O `setup.ts` substitui `matchMedia` e `ResizeObserver`, que o jsdom não tem. Os testes do agendamento fixam o relógio num instante em que o dia de São Paulo e o de Tóquio são diferentes, com `vi.useFakeTimers({ toFake: ['Date'] })`.
 - **API:** o MSW intercepta as requisições em `http://api.test`, o `VITE_API_BASE_URL` dos testes. Uma requisição sem handler faz o teste falhar. Cada teste troca as respostas com `server.use`.
-- **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; o roteador; preços e durações; e o agendamento público (negócio e slug inexistente, horários no fuso do negócio, dia sem horários, teclado, parâmetros inválidos, idempotência com clique duplo e falha de rede, `409`, `429`, `422`, limite de e-mail, repetição sem link e tela de sucesso).
+- **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; o roteador; preços e durações; o agendamento público (negócio e slug inexistente, horários no fuso do negócio, dia sem horários, teclado, parâmetros inválidos, idempotência com clique duplo e falha de rede, `409`, `429`, `422`, limite de e-mail, repetição sem link e tela de sucesso); e o link do cliente (os quatro status, prazo vencido, serviço desativado, link inválido, foco do diálogo com Esc, cancelamento com clique duplo, recusas definitivas, `429` e falha de rede, profissional e dia iniciais da remarcação, `409`, limite de e-mail e serviço que saiu da página).
 - **CI:** o job do frontend roda ESLint, `typecheck`, `test:coverage`, a conferência da D51 e o build.
 
 ## Uso dos MCPs (D58)
 
-- **shadcn:** consulte os componentes pelo MCP e instale com `npx shadcn add <nome>`. Eles ficam em `src/components/ui` e só mudam para traduzir textos, atender às regras de lint ou alcançar o contraste AA (como a variante `destructive` do botão e do selo).
-- **Magic:** só em componentes de destaque: a seção principal de `/` e a escolha de dia e horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion. O `DateTimePicker` veio do "Time Slot Picker" (21st.dev, klyv-ui, id 43217), que não tem dependências. Manteve os dois grupos de rádio navegáveis pelo teclado e o fuso sempre impresso. Trocou as datas no fuso do navegador pelas de `src/lib/datetime.ts`, a carga de todos os dias pela de um dia por vez, as cores pelos tokens e os alvos para 44 px, e passou a agrupar os horários por período.
+- **shadcn:** consulte os componentes pelo MCP e instale com `npx shadcn add <nome>`. Eles ficam em `src/components/ui` e só mudam para traduzir textos, atender às regras de lint ou alcançar o contraste AA (como a variante `destructive` do botão e do selo). Quando o CLI pede para sobrescrever um componente já ajustado, como o `button.tsx` ao instalar o `alert-dialog`, a resposta é não. O `Slot` do Radix junta as classes sem o `tailwind-merge`, então um tamanho passado a `AlertDialogCancel` precisa do `!`.
+- **Magic:** só em componentes de destaque: a seção principal de `/` e a escolha de dia e horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion. O `DateTimePicker` veio do "Time Slot Picker" (21st.dev, klyv-ui, id 43217), que não tem dependências. Manteve os dois grupos de rádio navegáveis pelo teclado e o fuso sempre impresso. Trocou as datas no fuso do navegador pelas de `src/lib/datetime.ts`, a carga de todos os dias pela de um dia por vez, as cores pelos tokens e os alvos para 44 px, e passou a agrupar os horários por período. O link do cliente reaproveita o mesmo `DateTimePicker` e não tem componente de destaque novo, então não usou o Magic.
 - **chrome-devtools:** cada página nova ou alterada é conferida em 375 px e 1280 px, nos modos claro e escuro, sem rolagem horizontal, sem erros no console, com o contraste dos pares da tabela medido na página e o foco conferido pelo teclado.
 - **Arquivos de design system (D62):** nada de `design-system/`, `PRODUCT.md` ou `DESIGN.md` no repositório. A referência é `src/index.css` mais esta seção.

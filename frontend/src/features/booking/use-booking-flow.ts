@@ -3,7 +3,14 @@ import { createSearchParams, useLocation, useNavigate, useSearchParams } from 'r
 
 import { isLocalDate, localDateRange, toLocalDate } from '@/lib/datetime'
 
-import type { PublicBusiness, PublicProfessional, PublicService } from './queries'
+import {
+  ANY_PROFESSIONAL,
+  isBookable,
+  professionalsOf,
+  type PublicBusiness,
+  type PublicProfessional,
+  type PublicService,
+} from '@/features/scheduling'
 
 /**
  * State of the booking flow (D65). Service, professional and day live in the
@@ -14,8 +21,6 @@ import type { PublicBusiness, PublicProfessional, PublicService } from './querie
  */
 
 export const SEARCH = { service: 'servico', professional: 'profissional', day: 'dia' } as const
-/** Value of `profissional` for "any professional" (RN10). */
-export const ANY_PROFESSIONAL = 'qualquer'
 
 export type Step = 'service' | 'professional' | 'datetime' | 'customer'
 
@@ -30,20 +35,6 @@ export interface Selection {
   /** Days open for booking, from today in the business (RN05). */
   days: string[]
   day: string
-}
-
-/** Only the professionals the business lists as bookable (RN07). */
-export function professionalsOf(
-  business: PublicBusiness,
-  service: PublicService,
-): PublicProfessional[] {
-  return business.professionals.filter((professional) =>
-    service.professional_ids.includes(professional.id),
-  )
-}
-
-export function isBookable(business: PublicBusiness, service: PublicService): boolean {
-  return professionalsOf(business, service).length > 0
 }
 
 export function resolveSelection(
