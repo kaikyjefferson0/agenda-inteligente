@@ -12,6 +12,7 @@ import { errorMessage } from '@/api/messages'
 import { PATHS } from '@/app/router'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { StatusBadge } from '@/features/scheduling'
 import { formatDateTime } from '@/lib/datetime'
 
 import type { Outcome } from '../outcome'
@@ -19,7 +20,6 @@ import { appointmentKeys, type CustomerAppointment } from '../queries'
 import { AppointmentDetails } from './AppointmentDetails'
 import { CancelDialog } from './CancelDialog'
 import { RescheduleForm } from './RescheduleForm'
-import { StatusBadge } from './StatusBadge'
 import { Unbroken } from './Unbroken'
 
 interface AppointmentViewProps {

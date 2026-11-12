@@ -1,5 +1,5 @@
-import { CalendarX2Icon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
-import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
+import { CalendarX2Icon, CheckIcon, ChevronRightIcon } from 'lucide-react'
+import { useId, useRef, type ReactNode } from 'react'
 
 import { ErrorMessage } from '@/components/feedback/ErrorMessage'
 import { Button } from '@/components/ui/button'
@@ -12,13 +12,11 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  formatLocalDate,
-  formatLocalDayParts,
-  formatTime,
-  localHour,
-} from '@/lib/datetime'
+import { formatLocalDate, formatTime, localHour } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
+
+import { targetIndex } from '../radio-keys'
+import { DayStrip, type DayStripHandle } from './DayStrip'
 
 /**
  * Choice of day and time (D58: the highlight component that comes from
@@ -60,28 +58,6 @@ const PERIODS = [
   { id: 'noite', label: 'Noite', from: 18, to: 24 },
 ] as const
 
-const STEP_KEYS: Record<string, number> = {
-  ArrowRight: 1,
-  ArrowDown: 1,
-  ArrowLeft: -1,
-  ArrowUp: -1,
-}
-
-/** Arrow keys, Home and End over a radio group, wrapping around. */
-function targetIndex(event: KeyboardEvent, index: number, count: number): number | null {
-  if (event.key === 'Home') return 0
-  if (event.key === 'End') return count - 1
-  const delta = STEP_KEYS[event.key]
-  if (delta === undefined) return null
-  return (index + delta + count) % count
-}
-
-function prefersReducedMotion(): boolean {
-  return typeof window.matchMedia === 'function'
-    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    : false
-}
-
 export function DateTimePicker({
   timeZone,
   days,
@@ -98,113 +74,13 @@ export function DateTimePicker({
   notice,
 }: DateTimePickerProps) {
   const uid = useId()
-  const strip = useRef<HTMLDivElement>(null)
-  const dayRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const strip = useRef<DayStripHandle>(null)
   const dayIndex = Math.max(0, days.indexOf(day))
-
-  // Keeps the chosen day in view, inside the strip only (never the page).
-  useEffect(() => {
-    const container = strip.current
-    const button = dayRefs.current[dayIndex]
-    if (container === null || button == null) return
-    const start = button.offsetLeft
-    const end = start + button.offsetWidth
-    if (start >= container.scrollLeft && end <= container.scrollLeft + container.clientWidth) return
-    container.scrollTo?.({
-      left: start - (container.clientWidth - button.offsetWidth) / 2,
-      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-    })
-  }, [dayIndex])
-
-  const scrollStrip = (direction: 1 | -1) => {
-    const container = strip.current
-    container?.scrollBy?.({
-      left: direction * container.clientWidth * 0.8,
-      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-    })
-  }
-
   const nextDay = days[dayIndex + 1]
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <div className="flex min-w-0 items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          className="hidden size-11 shrink-0 sm:inline-flex"
-          aria-label="Dias anteriores"
-          onClick={() => scrollStrip(-1)}
-        >
-          <ChevronLeftIcon className="size-5" aria-hidden="true" />
-        </Button>
-        <div
-          ref={strip}
-          role="radiogroup"
-          aria-label="Dia"
-          className="relative -mx-4 flex min-w-0 flex-1 snap-x snap-proximity gap-2 overflow-x-auto scroll-px-4 px-4 py-1 [scrollbar-width:none] sm:mx-0 sm:scroll-px-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
-        >
-          {days.map((date, index) => {
-            const selected = index === dayIndex
-            const parts = formatLocalDayParts(date)
-            const isToday = date === today
-            return (
-              <button
-                key={date}
-                ref={(node) => {
-                  dayRefs.current[index] = node
-                }}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                aria-label={`${isToday ? 'Hoje, ' : ''}${formatLocalDate(date)}`}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => onDayChange(date)}
-                onKeyDown={(event) => {
-                  const next = targetIndex(event, index, days.length)
-                  if (next === null) return
-                  event.preventDefault()
-                  onDayChange(days[next])
-                  dayRefs.current[next]?.focus()
-                }}
-                className={cn(
-                  'flex h-19 w-15 shrink-0 snap-start flex-col items-center justify-center gap-0.5 rounded-xl border text-center transition-[background-color,border-color,color] duration-(--duration-fast)',
-                  selected
-                    ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                    : 'border-border bg-card text-foreground hover:border-input',
-                )}
-              >
-                <span
-                  className={cn(
-                    'text-xs font-medium',
-                    selected ? 'text-primary-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {isToday ? 'hoje' : parts.weekday}
-                </span>
-                <span className="text-xl leading-none font-semibold tabular-nums">{parts.day}</span>
-                <span
-                  className={cn(
-                    'text-xs',
-                    selected ? 'text-primary-foreground' : 'text-muted-foreground',
-                  )}
-                >
-                  {parts.month}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          className="hidden size-11 shrink-0 sm:inline-flex"
-          aria-label="Próximos dias"
-          onClick={() => scrollStrip(1)}
-        >
-          <ChevronRightIcon className="size-5" aria-hidden="true" />
-        </Button>
-      </div>
+      <DayStrip ref={strip} days={days} today={today} value={day} onValueChange={onDayChange} />
 
       <div className="flex flex-col gap-4">
         <h3 id={`${uid}-day`} className="text-lg leading-snug font-semibold first-letter:uppercase">
@@ -247,7 +123,7 @@ export function DateTimePicker({
                   className="h-11 px-4 text-[0.9375rem]"
                   onClick={() => {
                     onDayChange(nextDay)
-                    dayRefs.current[dayIndex + 1]?.focus()
+                    strip.current?.focusDay(nextDay)
                   }}
                 >
                   Ver {formatLocalDate(nextDay).split(',')[0]}

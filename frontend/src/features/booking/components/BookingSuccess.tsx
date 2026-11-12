@@ -5,10 +5,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatLocalDate, formatTimeRange, toLocalDate } from '@/lib/datetime'
+import { CopyLinkButton } from '@/features/scheduling'
 import { formatPrice } from '@/lib/format'
 
 import type { Booking } from '../queries'
-import { CopyLinkButton } from './CopyLinkButton'
 
 interface BookingSuccessProps {
   booking: Booking

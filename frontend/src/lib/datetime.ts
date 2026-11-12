@@ -104,11 +104,8 @@ export function toLocalDate(instant: Instant, timeZone: string): string {
  * day, so it is formatted in UTC and never shifts with any time zone.
  */
 export function formatLocalDate(localDate: string): string {
-  const match = LOCAL_DATE.exec(localDate)
-  if (match === null) throw new RangeError(`Invalid local date: ${localDate}`)
-  const [, year, month, day] = match
-  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
-  if (date.getUTCDate() !== Number(day)) throw new RangeError(`Invalid local date: ${localDate}`)
+  const date = parseLocalDate(localDate)
+  if (date === null) throw new RangeError(`Invalid local date: ${localDate}`)
   return `${formatter('UTC', WEEKDAY).format(date)}, ${formatter('UTC', DATE).format(date)}`
 }
 
@@ -117,7 +114,8 @@ function parseLocalDate(localDate: string): Date | null {
   if (match === null) return null
   const [, year, month, day] = match
   const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)))
-  return date.getUTCDate() === Number(day) ? date : null
+  // Date.UTC rolls over (month 13, day 31 of April): the parts must come back as given.
+  return date.getUTCMonth() === Number(month) - 1 && date.getUTCDate() === Number(day) ? date : null
 }
 
 /** Whether the string is a real calendar day as `YYYY-MM-DD` (e.g. not `2026-02-30`). */
@@ -165,4 +163,85 @@ export function formatLocalDayParts(localDate: string): LocalDayParts {
 /** The hour (0 to 23) of the instant in the business. */
 export function localHour(instant: Instant, timeZone: string): number {
   return Number(formatTime(instant, timeZone).slice(0, 2))
+}
+
+const MINUTE_MS = 60_000
+const DAY_MS = 24 * 60 * MINUTE_MS
+const LOCAL_TIME = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+/** The wall clock of the instant in the business, read as if it were UTC (ms). */
+function wallClockMs(instant: number, timeZone: string): number {
+  const parts = formatter(timeZone, PARTS).formatToParts(new Date(instant))
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? '0')
+  return Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'))
+}
+
+/** Minutes since the local midnight of the wall clock (0 to 1439). */
+export function localMinutes(instant: Instant, timeZone: string): number {
+  const time = formatTime(instant, timeZone)
+  return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+}
+
+/** `HH:MM` as minutes since midnight, or `null` when it is not a time of the day. */
+export function parseLocalTime(time: string): number | null {
+  const match = LOCAL_TIME.exec(time)
+  return match === null ? null : Number(match[1]) * 60 + Number(match[2])
+}
+
+/** Minutes since midnight as `HH:MM`. */
+export function formatMinutes(minutes: number): string {
+  const hours = Math.floor(minutes / 60)
+  return `${String(hours).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+}
+
+/** 0 for Monday to 6 for Sunday, as `weekday` in the API (docs/07-api.md). */
+export function localWeekday(localDate: string): number {
+  const date = parseLocalDate(localDate)
+  if (date === null) throw new RangeError(`Invalid local date: ${localDate}`)
+  return (date.getUTCDay() + 6) % 7
+}
+
+export type LocalInstant =
+  | { kind: 'ok'; instant: Date }
+  /** The local time was skipped by a change of offset, such as the start of daylight time. */
+  | { kind: 'nonexistent' }
+
+/**
+ * The instant of a local day and time of the business (RN06): an ambiguous
+ * time, repeated when the clock goes back, takes its first occurrence; a time
+ * skipped when the clock goes forward does not exist.
+ */
+export function localDateTimeToInstant(localDate: string, time: string, timeZone: string): LocalInstant {
+  const date = parseLocalDate(localDate)
+  const minutes = parseLocalTime(time)
+  if (date === null || minutes === null) throw new RangeError(`Invalid local time: ${localDate} ${time}`)
+  const wanted = date.getTime() + minutes * MINUTE_MS
+  // The offsets around the wanted wall clock: any instant that shows it uses one of them.
+  const offsets = new Set(
+    [wanted - DAY_MS, wanted, wanted + DAY_MS].map((probe) => wallClockMs(probe, timeZone) - probe),
+  )
+  const matches = [...offsets]
+    .map((offset) => wanted - offset)
+    .filter((instant) => wallClockMs(instant, timeZone) === wanted)
+    .sort((a, b) => a - b)
+  return matches.length === 0 ? { kind: 'nonexistent' } : { kind: 'ok', instant: new Date(matches[0]) }
+}
+
+/**
+ * The first instant of a local day of the business. It is not always 00:00:
+ * on 04/11/2018 in São Paulo the clock went from 23:59 straight to 01:00.
+ */
+export function startOfLocalDay(localDate: string, timeZone: string): Date {
+  const midnight = localDateTimeToInstant(localDate, '00:00', timeZone)
+  if (midnight.kind === 'ok') return midnight.instant
+  // Midnight was skipped: the day starts at the change, with the offset of the day before.
+  const wall = parseLocalDate(localDate)!.getTime()
+  const before = wall - DAY_MS
+  return new Date(wall - (wallClockMs(before, timeZone) - before))
+}
+
+/** An instant for the API, in UTC and without fractions: `2026-11-10T12:07:00Z`. */
+export function toUtcInstant(instant: Instant): string {
+  return parseInstant(instant).toISOString().replace(/\.\d{3}Z$/, 'Z')
 }

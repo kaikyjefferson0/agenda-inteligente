@@ -1,7 +1,12 @@
 // Panel group (D54): loaded on demand as one chunk, together with its layout.
+import { useQuery } from '@tanstack/react-query'
+
+import { ErrorMessage } from '@/components/feedback/ErrorMessage'
+import { PageLoader } from '@/components/feedback/PageLoader'
 import { PanelLayout } from '@/components/layout/PanelLayout'
 import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
-import { RequireOwner, usePanelAccount } from '@/features/auth'
+import { meQuery, RequireOwner, usePanelAccount } from '@/features/auth'
+import { TeamAgenda } from '@/features/team-agenda'
 
 /** The panel with who is in and the logout (UC02). */
 export function ProtectedPanelLayout() {
@@ -9,11 +14,30 @@ export function ProtectedPanelLayout() {
   return <PanelLayout account={account} onLogout={logout} loggingOut={loggingOut} />
 }
 
+/** UC15 to UC18: the page reads who is in and hands it to the agenda (D66, D79). */
 export function AgendaPage() {
+  const me = useQuery(meQuery)
+  if (me.data === undefined) {
+    return me.isError ? (
+      <section className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-8">
+        <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
+        <ErrorMessage
+          error={me.error}
+          title="Não foi possível abrir a agenda"
+          onRetry={() => void me.refetch()}
+        />
+      </section>
+    ) : (
+      <PageLoader />
+    )
+  }
   return (
-    <PlaceholderPage
-      title="Agenda"
-      description="Aqui a equipe vai ver os agendamentos por dia, no fuso do negócio, e registrar o resultado de cada atendimento."
+    <TeamAgenda
+      account={{
+        userId: me.data.user.id,
+        isOwner: me.data.user.role === 'owner',
+        timeZone: me.data.business.timezone,
+      }}
     />
   )
 }
