@@ -17,8 +17,8 @@ flowchart LR
 | Frontend | SPA com a página pública e o painel da equipe |
 | API | Autenticação, regras de negócio e persistência |
 | PostgreSQL | Dados, garantias de integridade, fila de e-mails e contadores de limite |
-| Worker | Envia os e-mails pendentes, com retentativas |
-| Restauração da demo | Tarefa agendada que recria os dados do negócio demo em uma única transação, apagando os dependentes antes, porque as chaves estrangeiras usam `ON DELETE RESTRICT` |
+| Worker | Envia os e-mails pendentes, com retentativas. Em produção, roda dentro do processo da API (D105) |
+| Restauração da demo | Tarefa que recria os dados do negócio demo em uma única transação, apagando os dependentes antes, porque as chaves estrangeiras usam `ON DELETE RESTRICT`. Em produção, a própria API a dispara uma vez por dia (D106) |
 
 ## Estrutura do repositório
 
@@ -132,10 +132,10 @@ Tudo acontece em uma única transação: uma falha no meio deixa a demo anterior
 
 - **Senhas:** hash com Argon2id, com 64 MiB, 3 passadas e paralelismo 4. O login verifica um hash fictício quando a conta não tem senha, para que o tempo não revele se ela existe.
 - **Token de acesso:** JWT HS256 de 15 minutos, mantido em memória. Contém `sub`, `sid` (a família do refresh), `iss`, `iat` e `exp`, sem `business_id`.
-- **Refresh:** token opaco, com rotação, guardado como hash e entregue em cookie `HttpOnly`, `Secure`, `SameSite=Strict` e `Path=/api/v1/auth`. Expira depois de 7 dias sem uso e, em qualquer caso, 30 dias depois do login ([RN31](03-regras-negocio.md#contas-e-demo)). O reuso revoga a família inteira. O `Secure` não tem opção de desligar; em desenvolvimento, Chrome e Firefox o aceitam em `localhost`.
+- **Refresh:** token opaco, com rotação, guardado como hash e entregue em cookie `HttpOnly`, `Secure`, `SameSite=Strict` e `Path=/api/v1/auth`, sem `Domain`. Na etapa do deploy, passa a `__Host-refresh_token` com `Path=/` (D108), para que um subdomínio irmão não consiga plantar o cookie. Expira depois de 7 dias sem uso e, em qualquer caso, 30 dias depois do login ([RN31](03-regras-negocio.md#contas-e-demo)). O reuso revoga a família inteira. O `Secure` não tem opção de desligar; em desenvolvimento, Chrome e Firefox o aceitam em `localhost`.
 - **Revogação imediata:** a dependência de autenticação carrega o usuário a cada requisição, confere `is_active` e exige que a família do `sid` não esteja revogada. Assim, desativação, logout, redefinição de senha e reuso de refresh valem na hora, sem esperar o token de acesso expirar.
 - **Concorrência:** todo fluxo de sessão ou credencial trava primeiro o usuário e depois seus tokens. Duas operações do mesmo usuário ficam em série, sem deadlock, e nenhuma sessão sobrevive a uma redefinição simultânea.
-- **CSRF:** `SameSite=Strict`, cabeçalho `X-Requested-With` nas rotas com cookie e lista fixa de origens em CORS.
+- **CSRF:** `SameSite=Strict`, cabeçalho `X-Requested-With` nas rotas com cookie e lista fixa de origens em CORS. Na etapa do deploy, `/auth/refresh` e `/auth/logout` também conferem o `Origin` (D110), porque os subdomínios do mesmo domínio contam como o mesmo site para o `SameSite`.
 - **Segredos:** `JWT_SECRET` e `RATE_LIMIT_KEY_SECRET` precisam ter ao menos 32 caracteres, ou a aplicação não sobe.
 
 ### Isolamento entre negócios
@@ -216,14 +216,174 @@ Todos rodam em `.github/workflows/ci.yml`, junto com a conferência do contrato 
 
 ## Deploy
 
-- **API, worker e banco:** PaaS, como Render ou Railway.
-- **Frontend:** hospedagem estática, como Cloudflare Pages ou Vercel.
-- **Migrações:** executadas uma vez antes de cada nova versão da API.
-- **Restauração da demo:** tarefa agendada da plataforma, todos os dias às 03:00 de `America/Sao_Paulo`, com o mesmo build e as mesmas variáveis da API, `DEMO_PASSWORD` incluída, executando `python -m app.jobs.restore_demo` (D45). Um código de saída diferente de 0 indica restauração recusada.
+API e site no Render (plano gratuito), banco no Neon (gratuito) e e-mails pelo Resend (gratuito), com o domínio `kaikyjefferson.dev`: o site em `agenda.kaikyjefferson.dev` e a API em `api-agenda.kaikyjefferson.dev`. Os dois são subdomínios do mesmo domínio porque os endereços `*.onrender.com` são sites diferentes para o navegador, o que impediria o cookie `SameSite=Strict`, e o mesmo domínio autentica o envio de e-mails com SPF e DKIM. O detalhe está em [Produção](#produção) (D105 a D119).
 
-A escolha final e os preços serão confirmados antes do deploy, porque os planos gratuitos mudam e podem hibernar serviços ou não oferecer tarefas agendadas.
+## Produção
 
-**Domínio próprio obrigatório:** frontend e API devem ficar em subdomínios do mesmo domínio, como `app.exemplo.com` e `api.exemplo.com`. Domínios padrão de PaaS costumam ser sites diferentes para o navegador, o que impediria o cookie `SameSite=Strict`. O mesmo domínio serve para autenticar o envio de e-mails com SPF e DKIM.
+Deploy aprovado na etapa do plano de deploy (D105 a D119, nos [Pontos a revisar](README.md#pontos-a-revisar)): API e site no Render (plano gratuito), banco no Neon (gratuito) e e-mails pelo Resend (gratuito), como o Estoque Inteligente, com o domínio próprio `kaikyjefferson.dev`, que também servirá aos outros projetos do responsável e será comprado na etapa do deploy. O site fica em `agenda.kaikyjefferson.dev` e a API em `api-agenda.kaikyjefferson.dev`. As mudanças de código e de configuração que as decisões pedem ficam para a etapa do deploy; até lá, o código segue como descrito no resto deste documento. Limites e preços foram conferidos na documentação oficial em 13/11/2026 e mudam com frequência; cada um tem a fonte.
+
+```mermaid
+flowchart LR
+    B["Navegador"] --> S["agenda.kaikyjefferson.dev<br/>Render Static Site, CDN"]
+    B -->|"CORS com credenciais"| A["api-agenda.kaikyjefferson.dev<br/>Render Web Service grátis<br/>API + worker + restauração"]
+    A --> N[("Neon grátis<br/>conexão direta")]
+    A -->|"HTTPS"| R["Resend<br/>mail.kaikyjefferson.dev"]
+```
+
+### Limites que guiam o deploy
+
+| Serviço | Limite no plano gratuito | Fonte |
+|---|---|---|
+| Render, web service | Dorme depois de 15 minutos sem tráfego de entrada; acordar leva "cerca de um minuto". 750 horas por **workspace** por mês, somando todos os serviços grátis (inclusive o Estoque); acabando, todos ficam suspensos até o mês seguinte. Sem disco persistente, sem shell, sem tarefas avulsas, pode reiniciar a qualquer momento, uma instância só. Portas 25, 465 e 587 (SMTP) bloqueadas na saída. Aceita domínio personalizado | [render.com/docs/free](https://render.com/docs/free) |
+| Render, pre-deploy command | Só em web services pagos, private services e background workers | [render.com/docs/deploys](https://render.com/docs/deploys) |
+| Render, background worker | Não há instância grátis; a menor custa US$ 7/mês (0,5 CPU, 512 MB) | [render.com/pricing](https://render.com/pricing.md), [docs/background-workers](https://render.com/docs/background-workers) |
+| Render, cron job | US$ 0,00016 por minuto na menor instância, com cobrança mínima de US$ 1/mês por cron job | [render.com/pricing](https://render.com/pricing.md), [docs/cronjobs](https://render.com/docs/cronjobs) |
+| Render, banda de saída | 5 GB/mês no plano Hobby, por workspace (site, API e o Estoque juntos). Sem forma de pagamento cadastrada, passar do limite faz os serviços dormirem até o mês seguinte | [docs/outbound-bandwidth](https://render.com/docs/outbound-bandwidth), [pricing](https://render.com/pricing.md) |
+| Render, domínios | "Your workspace includes an amount of custom domains based on its plan": 2 no Hobby; cada um a mais custa US$ 0,25/mês. Certificado TLS criado e renovado automaticamente (Let's Encrypt e Google Trust Services), com HTTP redirecionado para HTTPS. Subdomínio por CNAME para o endereço `onrender.com` do serviço; sem `AAAA`, porque o Render usa só IPv4. O endereço `onrender.com` pode ser desligado depois que houver um domínio | [docs/custom-domains](https://render.com/docs/custom-domains), [configure-other-dns](https://render.com/docs/configure-other-dns), [static-sites](https://render.com/docs/static-sites) |
+| Render, health check | A cada poucos segundos, com 5 s de timeout. Falhando por 15 s, para de receber tráfego; por 60 s, a instância reinicia. Um deploy que não fica saudável em 15 minutos é cancelado | [docs/health-checks](https://render.com/docs/health-checks) |
+| Neon | Por projeto: 1 GB de armazenamento (passar bloqueia escritas), 100 CU-horas/mês (0,25 CU por cerca de 400 horas), 5 GB de transferência; acabando CU-horas ou transferência, o compute fica suspenso até o próximo ciclo, sem perder dados. Dorme depois de 5 minutos sem uso, sem como desligar no Free; acorda "em poucas centenas de milissegundos". Restauração do histórico de 6 horas | [neon.com/docs/introduction/plans](https://neon.com/docs/introduction/plans), [pricing](https://neon.com/pricing), [scale-to-zero](https://neon.com/docs/introduction/scale-to-zero) |
+| Resend | 3.000 e-mails/mês e 100/dia por conta, 3 domínios, 10 requisições/s. Sem domínio verificado, só envia do `resend.dev` para o e-mail da própria conta. O Resend recomenda enviar de um subdomínio | [resend.com/pricing](https://resend.com/pricing), [403 do resend.dev](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain.md), [domínios](https://resend.com/docs/dashboard/domains/introduction) |
+| GitHub Actions | `schedule` a cada 5 minutos no mínimo, pode atrasar em horário de pico e é desligado depois de 60 dias sem atividade num repositório público. Executores padrão grátis em repositório público (este é público) | [eventos](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows), [cobrança](https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-actions/about-billing-for-github-actions) |
+| Navegador | `onrender.com` está na seção privada da Public Suffix List: dois endereços `*.onrender.com` são sites diferentes. Já `agenda.kaikyjefferson.dev` e `api-agenda.kaikyjefferson.dev` são o mesmo site | [public_suffix_list.dat](https://publicsuffix.org/list/public_suffix_list.dat) |
+
+### Domínio (D107)
+
+| | `.dev` | `.com.br` |
+|---|---|---|
+| Preço anual | Cloudflare Registrar, a preço de custo: cerca de US$ 8,20 no registro e US$ 12,20 na renovação ([cfdomainpricing.com](https://cfdomainpricing.com/), fonte não oficial). Porkbun: US$ 12,87, com promoção de US$ 8,75 no primeiro ano ([porkbun.com/tld/dev](https://porkbun.com/tld/dev)). Em dólar, no cartão, com IOF | R$ 40/ano no Registro.br, o valor do NIC.br desde 2017 ([TecMundo](https://www.tecmundo.com.br/internet/405860-descubra-quanto-custa-um-dominio-de-site-e-como-registrar-o-seu.htm); as páginas do Registro.br não abriram na consulta) |
+| Onde registrar | Qualquer registrador credenciado: Cloudflare, Porkbun e outros | Registro.br, direto, ou um registrador credenciado que repassa a anuidade |
+| Exigências | Nenhuma: "Anyone" pode registrar, sem restrição de uso ([Google Registry](https://www.registry.google/domains/dev/)) | CPF (pessoa física) ou CNPJ, com nome, endereço, e-mail e telefone ([Resolução CGI.br 2008/008](https://cgi.br/resolucoes/documento/2008/CGI.br_Resolucao_2008_008.pdf); [hardware.com.br](https://www.hardware.com.br/?p=110322) sobre a liberação para pessoa física). Sem renovar, o nome é liberado para outra pessoa |
+| HTTPS | Obrigatório: o `.dev` inteiro está na lista de HSTS pré-carregada dos navegadores ([Google Registry](https://www.registry.google/domains/dev/)). Combina com o Render, que emite o certificado sozinho | Opcional; o HSTS vem do cabeçalho que o site e a API enviarem (D117) |
+| DNS | O da Cloudflare, gratuito, tem guia próprio no Render e no Resend (o Resend configura sozinho pelo "Sign in to Cloudflare") | Os servidores DNS do Registro.br (gratuitos, mas o suporte a CNAME, MX e TXT não foi confirmado nesta pesquisa) ou o DNS gratuito da Cloudflare, trocando os servidores no Registro.br |
+
+Para este uso, os dois servem. O `.dev` custa um pouco mais e é pago em dólar, mas traz HTTPS obrigatório e um DNS com guias oficiais nos dois serviços. O `.com.br` é mais barato e pago em reais, mas exige CPF e não tem guia do Resend para o DNS do Registro.br. Escolhido: `.dev`, como `kaikyjefferson.dev`.
+
+**Quantidade no Render:** o Agenda usa os 2 domínios incluídos no Hobby (`agenda.` e `api-agenda.`). Cada projeto que vier depois para o mesmo workspace soma US$ 0,25/mês por domínio; o Estoque, com site e API, somaria US$ 0,50/mês. A página dos static sites diz "Add custom domains to your static site for free" ao lado da cota, sem explicar se o static site conta nela; conferir no painel ao adicionar.
+
+### Registros de DNS (D107, D111)
+
+Sem valores reais: o Render e o Resend mostram cada valor no painel, e os nomes abaixo são relativos ao domínio.
+
+| Tipo | Nome | Aponta para | Para que serve |
+|---|---|---|---|
+| `CNAME` | `agenda` | endereço `onrender.com` do Static Site | Site do Agenda ([configure-other-dns](https://render.com/docs/configure-other-dns)) |
+| `CNAME` | `api-agenda` | endereço `onrender.com` da API | API do Agenda |
+| `CAA` | raiz | `letsencrypt.org` e `pki.goog` | **Só se o domínio já tiver registros CAA**: autoriza as autoridades que o Render usa ([custom-domains](https://render.com/docs/custom-domains)). Sem CAA, nada a fazer |
+| `TXT` | `resend._domainkey.mail` | chave pública `p=…` | DKIM: assinatura dos e-mails enviados de `mail.kaikyjefferson.dev` ([Resend, Cloudflare](https://resend.com/docs/knowledge-base/cloudflare)) |
+| `MX` | `send.mail` | `feedback-smtp.<região>.amazonses.com`, prioridade 10 | Return-Path: recebe os avisos de devolução e de reclamação; não é caixa de entrada |
+| `TXT` | `send.mail` | `v=spf1 include:amazonses.com ~all` | SPF: autoriza o Resend a enviar pelo Return-Path |
+| `TXT` | `_dmarc.mail` | `v=DMARC1; p=none; …` | DMARC: recomendado depois da verificação, começando em `p=none` ([Resend, DMARC](https://resend.com/docs/dashboard/domains/dmarc)) |
+| `TXT` | raiz | `v=spf1 -all` | Recomendado, prática geral e não exigência do Resend: a raiz não envia e-mail, e isso impede que alguém a use como remetente |
+| `TXT` | `_dmarc` | `v=DMARC1; p=reject; …` | Idem, para a raiz |
+
+- Nenhum `AAAA` em `agenda` e `api-agenda`.
+- Na Cloudflare, todos esses registros ficam como **DNS only** (nuvem cinza). O Render exige isso para verificar e emitir o certificado e só permite o proxy depois; os registros ficam em DNS only, porque o proxy mudaria os cabeçalhos de IP da D118. O Resend também pede DNS only.
+- Domínios criados no Resend depois de agosto de 2026 podem receber dois `CNAME` no lugar do par `MX` e `TXT` em `send`; vale o que o painel mostrar.
+- Nada de `MX` de recebimento: o Agenda não recebe e-mail.
+
+### Decisões
+
+#### Worker de e-mails (D105)
+
+| Opção | Custo | O que muda no código |
+|---|---|---|
+| **A. Worker dentro do processo da API** | Grátis; complexidade baixa | O `lifespan` da API inicia `serve()` de `app/jobs/email_worker.py` numa tarefa `asyncio` e, no desligamento, aciona o `stop` e espera a tarefa. Uma variável (por exemplo, `EMAIL_WORKER_IN_PROCESS`, desligada por padrão) liga isso só em produção; o `docker-compose.yml` continua com o `worker` próprio |
+| B. Background worker pago | US$ 7/mês | Nada; só o `render.yaml` |
+| C. GitHub Actions a cada 5 minutos rodando um ciclo | Grátis; complexidade média | Um modo "um ciclo e sai" e o workflow. Atrasos do `schedule`, desligamento depois de 60 dias e a URL do banco também no GitHub |
+| D. Enviar na própria requisição (`BackgroundTasks`) | Grátis | Contradiz a decisão do outbox (perde as retentativas e a garantia de "pelo menos uma vez") |
+
+**Com a API dormindo:** todo e-mail nasce de uma requisição à API, então ela está acordada quando há algo para enviar, e a mensagem sai em até 5 segundos, como hoje. A API só dorme 15 minutos depois da última requisição, então as retentativas de 1 e 5 minutos (D39) acontecem acordadas; as de 15 e 60 minutos podem esperar a próxima visita, e uma mensagem `pending` com mais de 24 horas expira, como já previsto. Ao dormir ou num novo deploy, o Render envia `SIGTERM`: a tarefa para entre lotes, e uma mensagem reservada e não gravada volta pela reserva de 5 minutos (D38).
+
+**Efeito no Neon:** a consulta a cada 5 segundos mantém o Neon acordado enquanto a API estiver acordada. Com o compute fixo em 0,25 CU, as 100 CU-horas cobrem cerca de 400 horas de API acordada por mês. Por isso nenhum serviço mantém a API acordada (D119): 24 horas por dia gastariam 730 horas do Render (somadas às do Estoque, passariam das 750) e cerca de 180 CU-horas do Neon.
+
+**Decidido:** A.
+
+#### Restauração diária da demo (D106)
+
+| Opção | Custo | O que muda no código |
+|---|---|---|
+| **A. A API restaura quando a demo ficou de um dia anterior** | Grátis; complexidade média | Uma conferência no mesmo laço da D105, ao subir e a cada 10 minutos: se a data do `created_at` do negócio demo (recriado a cada restauração, com `server_default=now()`) em `America/Sao_Paulo` é anterior a hoje e já passou das 03:00, chama `restore_demo`. A conferência se repete sob a trava da D45. Roda em segundo plano, depois de a API abrir a porta, para não somar à partida a frio. Sem tabela nova |
+| B. GitHub Actions agendado rodando `restore_demo` contra o Neon | Grátis; complexidade baixa | Só um workflow, com `DATABASE_URL` e `DEMO_PASSWORD` nos segredos do GitHub |
+| C. Cron job do Render | Mínimo de US$ 1/mês | Nada; só o `render.yaml` |
+| D. Restaurar só ao subir, se passou de 24 horas (como o Estoque) | Grátis | Como A, sem a conferência periódica |
+
+A demo é restaurada na primeira visita depois das 03:00 (ou na primeira conferência, se a API já estiver acordada), então quem visita sempre vê dados do dia (RN29). O efeito da D47 continua: quem estava logado na demo entra de novo. Em B, o desligamento depois de 60 dias sem atividade é provável num projeto de portfólio parado, e a demo envelheceria em silêncio.
+
+**Decidido:** A, com a restauração manual pela máquina local documentada para emergências. O aviso da D48 passa de "toda noite" a "todo dia".
+
+#### Cookie, CORS e CSRF com o domínio próprio (D108 a D110)
+
+`agenda.kaikyjefferson.dev` e `api-agenda.kaikyjefferson.dev` são origens diferentes e o mesmo site. Por isso:
+
+- **Cookie (D108, aprovada):** o `SameSite=Strict` passa a funcionar, porque a chamada do site para a API é do mesmo site. O cookie continua **sem `Domain`** (host-only em `api-agenda.kaikyjefferson.dev`): um `Domain=kaikyjefferson.dev` o mandaria a todos os subdomínios, inclusive os dos outros projetos. O nome passa a `__Host-refresh_token`, e o `Path`, de `/api/v1/auth` para `/`. **Motivo:** o domínio vai abrigar outros projetos em subdomínios, e o cookie não pode aceitar ser plantado por um subdomínio irmão ("cookie tossing"). O navegador só aceita o prefixo `__Host-` com `Secure`, sem `Domain` e com `Path=/`, e por isso o `Path` muda. O cookie continua `HttpOnly` e `Secure`; passa a acompanhar toda requisição à API, mas a API só o usa no refresh e no logout. Muda `app/api/auth.py` (nome e caminho, ao gravar e ao apagar) e os testes; o frontend não lê o cookie e não muda.
+- **CORS (D109):** necessário, com credenciais, como a configuração atual já prevê: `CORS_ALLOWED_ORIGINS=https://agenda.kaikyjefferson.dev`, só essa origem. O cliente já envia `credentials: 'include'` (`src/api/client.ts`). Requisições com `Authorization`, `Idempotency-Key`, `X-Requested-With` ou JSON fazem preflight, que o Starlette deixa em cache por 600 segundos por padrão. Nada muda no código.
+- **CSRF (D110, aprovada):** os subdomínios do mesmo domínio contam como o mesmo site para o `SameSite`, então uma página em outro subdomínio de `kaikyjefferson.dev` levaria o cookie. Três camadas: o `SameSite=Strict`, que barra os outros sites; o `X-Requested-With` em `/auth/refresh` e `/auth/logout`, que força o preflight do CORS, e o CORS só libera `https://agenda.kaikyjefferson.dev`; e, como segunda camada contra os subdomínios irmãos, a conferência do cabeçalho `Origin` nessas duas rotas contra `CORS_ALLOWED_ORIGINS`, com `403` para outra origem ou para a falta dele. É uma dependência pequena em `app/api/deps.py`, com teste. Nenhum subdomínio do domínio pode ser entregue a terceiros.
+
+Alternativas descartadas com o domínio: o rewrite de `/api/*` no Static Site (comportamento não documentado pelo Render para URL externa) e a API servindo o frontend (o site dormiria com ela).
+
+#### E-mails pelo Resend (D111)
+
+Um subdomínio só para envio, `mail.kaikyjefferson.dev`, verificado no Resend, com os registros da tabela de DNS. Um subdomínio próprio, sem `CNAME`, evita conflito com os registros do Render e pode servir aos outros projetos (o plano grátis aceita 3 domínios).
+
+- **Variáveis:** `EMAIL_BACKEND=resend`, `RESEND_API_KEY` e `EMAIL_FROM=Agenda Inteligente <nao-responda@mail.kaikyjefferson.dev>`.
+- **Limite:** `EMAIL_DAILY_CAP` até 100, o limite diário do plano grátis, que é **por conta**. Se outro projeto enviar pela mesma conta, a soma dos limites de todos não pode passar de 100.
+- **Código:** nada. A tela de sucesso e o aviso da D48, que pede o e-mail do próprio visitante, continuam corretos, porque os e-mails saem de verdade.
+
+#### Partida a frio (D112)
+
+O site, estático na CDN, abre na hora; a API leva cerca de um minuto para acordar, e o Neon, centenas de milissegundos. Hoje uma leitura se repete 2 vezes com espera curta e uma mutação não se repete (D53, D99), então quem chega com a API dormindo vê erro. Por isso, ao abrir o site, um `GET` sem credenciais a `https://api-agenda.kaikyjefferson.dev/health` acorda a API, sem precisar ler a resposta; as leituras com `NetworkError` ou `5xx` sem `code` se repetem com espera crescente por até cerca de 90 segundos, com o aviso "Conectando ao servidor, isso pode levar até um minuto", como no Estoque. Mutações continuam sem repetição. O `/health` não consulta o banco (D118), então essa chamada não acorda o Neon. Muda o frontend (cliente e `QueryClient`). O Argon2id (64 MiB, 3 passadas) numa instância grátis, de CPU fracionária, pode levar segundos por login: medir no primeiro deploy antes de qualquer ajuste.
+
+#### Migrações, build e banco (D113 a D115)
+
+- **Migrações (D113):** sem pre-deploy no plano grátis, o comando de início é `alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1`, como no Estoque. Uma migração que falha impede a API de subir, e o Render mantém a versão anterior. Roda também quando a API acorda, sem custo quando não há migração pendente. Sempre pela conexão direta do Neon, que recomenda não usar o pooler em migrações ([connection-pooling](https://neon.com/docs/connect/connection-pooling)).
+- **Build (D114):** API no runtime Python nativo, com `rootDir: backend`. O Render instala o uv quando há `uv.lock` na raiz do serviço ([python-version](https://render.com/docs/python-version), [uv-version](https://render.com/docs/uv-version)). Build `uv sync --frozen --no-dev`, com `PYTHON_VERSION=3.14.10` e `UV_VERSION=0.13.7`, as versões do `Dockerfile`, que é de desenvolvimento e não é usado no deploy. Site: `rootDir: frontend`, `npm ci && npm run build`, publica `dist`, `NODE_VERSION=24.22.2` e a regra `/*` → `/index.html` para as rotas do React. Tudo num `render.yaml` sem segredos. Depois de os domínios funcionarem, o endereço `onrender.com` dos dois serviços é desligado (`renderSubdomainPolicy`), para existir um só endereço de cada um.
+- **Banco (D115):** um projeto Neon próprio em AWS `us-east-1` (ao lado de Virginia, a região da API), com o compute fixo em 0,25 CU. `DATABASE_URL` pela conexão direta, sem `-pooler`. O Neon entrega `postgresql://…?sslmode=require&channel_binding=require`; para o asyncpg pelo SQLAlchemy, o formato a testar é `postgresql+asyncpg://…?ssl=require`, sem `channel_binding`, porque o asyncpg trata opções desconhecidas como configurações do servidor ([asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html)). O `pool_pre_ping=True` já cobre as conexões que o Neon fecha ao dormir. Os contadores de limite e a fila nunca são apagados hoje; a restauração diária passa a apagar as janelas de contador encerradas há mais de um dia e as mensagens `sent` e `failed` com mais de 30 dias, para ficar longe de 1 GB.
+
+#### Segredos e variáveis (D116)
+
+- **Geradas pelo Render:** `JWT_SECRET` e `RATE_LIMIT_KEY_SECRET`, com `generateValue: true` (256 bits em base64, 44 caracteres, acima dos 32 exigidos).
+- **Preenchidas no painel (`sync: false`):** `DATABASE_URL`, `DEMO_PASSWORD`, `RESEND_API_KEY` e, no site, `VITE_DEMO_PASSWORD`, igual ao `DEMO_PASSWORD` (D75).
+- **Endereços, que agora podem ficar no `render.yaml`:** `FRONTEND_BASE_URL=https://agenda.kaikyjefferson.dev` (base dos links nos e-mails), `CORS_ALLOWED_ORIGINS=https://agenda.kaikyjefferson.dev` e `VITE_API_BASE_URL=https://api-agenda.kaikyjefferson.dev`. Com o domínio próprio, nenhum endereço depende do sufixo que o Render acrescenta ao `onrender.com`, o problema que mandou o login do Estoque para a API de outra conta.
+- **Variáveis `VITE_`:** entram no build, então mudar qualquer uma exige novo deploy do site. A rota `POST /auth/demo`, já nos Pontos a revisar, tiraria a senha da demo do JavaScript. `VITE_API_PROXY_TARGET` só existe no desenvolvimento.
+
+#### Cabeçalhos de segurança (D117)
+
+- **Site, pelo `headers` do `render.yaml`:**
+  - `Strict-Transport-Security: max-age=31536000; includeSubDomains`, sem `preload`. No `.dev`, o HSTS já vem da lista dos navegadores.
+  - `X-Content-Type-Options: nosniff` e `X-Frame-Options: DENY`.
+  - `Referrer-Policy: strict-origin-when-cross-origin`; as páginas com token já declaram `no-referrer`.
+  - `Permissions-Policy` sem câmera, microfone e localização.
+  - `Content-Security-Policy` com `default-src 'self'`, `connect-src 'self' https://api-agenda.kaikyjefferson.dev`, `frame-ancestors 'none'`, `object-src 'none'` e `base-uri 'self'`. O build não tem script inline e as fontes são locais; conferir o console no primeiro deploy.
+  - Cache: `public, max-age=31536000, immutable` em `/assets/*` e `no-cache` no resto.
+- **API, por um middleware novo:** `nosniff`, `X-Frame-Options: DENY` e HSTS em todas as respostas (hoje só o link do cliente tem cabeçalhos próprios, D22). Sem CSP na API, porque ela só responde JSON, e uma CSP quebraria o Swagger UI do `/docs`.
+- **`/docs` ligado em produção:** `/docs`, `/redoc` e `/openapi.json` continuam públicos de propósito: a documentação é vitrine do projeto, e esconder as rotas não protege nada. A segurança vem da autenticação, dos papéis e dos limites.
+- **CSP e a API:** o `connect-src` do site lista `'self'` e `https://api-agenda.kaikyjefferson.dev`, a origem do `VITE_API_BASE_URL` (D116), então as chamadas do site à API, inclusive o aquecimento do `/health` (D112), passam pela CSP.
+
+#### Health check e IP do cliente (D118)
+
+- **Health check:** `healthCheckPath: /health`, que passa a **não consultar o banco**: responde `200` com `{"status": "ok"}` se o processo está de pé. Hoje ele faz `SELECT 1`, com 3 segundos de limite, e responde `503 DATABASE_UNAVAILABLE` sem o banco (`app/api/health.py`, D94). **Motivo:** o Render chama a verificação a cada poucos segundos, e uma consulta em cada chamada impediria o Neon de suspender e gastaria as CU-horas do plano gratuito. Enquanto a API está acordada, o worker (D105) ainda consulta o banco a cada 5 segundos; a verificação sem banco garante que ela não seja mais uma fonte de consultas. Um `DATABASE_URL` errado continua barrando o deploy, porque as migrações do comando de início (D113) falham antes de a API abrir a porta. Muda `app/api/health.py`, o `HealthResponse` (sem `database`) e o `503` no OpenAPI (D51, D94), `test_health.py` e a [API](07-api.md). No Estoque, que também tem health check, a API dorme normalmente; a documentação só fala em "tráfego de entrada".
+- **IP do cliente:** `TRUSTED_CLIENT_IP_HEADER=True-Client-IP`, como no Estoque, em que a Cloudflare na frente do Render define esse cabeçalho e substitui o do cliente. Esse comportamento foi comprovado no endereço `onrender.com`; no domínio próprio, conferir no primeiro deploy, de duas redes diferentes (Wi-Fi e 4G), que os limites contam cada visitante à parte. Por isso os registros na Cloudflare ficam como DNS only.
+
+#### Limites do workspace (D119)
+
+- **Compartilhados com o Estoque:** as 750 horas grátis, os 5 GB de banda e os 2 domínios incluídos são do workspace.
+- **Banda:** o site tem 1,3 MB sem compressão, então os 5 GB comportam milhares de primeiras visitas. Um robô insistente, porém, poderia esgotá-los e derrubar os dois projetos até o fim do mês.
+- **Forma de pagamento:** sem ela, o Render suspende em vez de cobrar, e o custo fica em zero. Com ela, os domínios além do segundo (US$ 0,25/mês cada) passam a ser cobrados.
+- **Sem serviço para manter a API acordada:** nenhum monitor, ping ou cron chama a API para impedir que ela durma, porque as 750 horas grátis do workspace são divididas com o Estoque; uma API sempre acordada gastaria 730 delas sozinha.
+- **Conferência:** olhar o uso no painel de cobrança depois do primeiro mês.
+
+### Custo mensal
+
+| Item | Tudo gratuito (sem domínio) | Com domínio próprio |
+|---|---|---|
+| Render: API (web service grátis) e site (static site) | US$ 0 | US$ 0 (os 2 domínios incluídos no Hobby; US$ 0,25/mês por domínio a mais, quando entrarem outros projetos) |
+| Neon Free | US$ 0 | US$ 0 |
+| Resend Free | US$ 0 (só envia para o e-mail da conta) | US$ 0 (3.000/mês, 100/dia) |
+| GitHub Actions (CI; repositório público) | US$ 0 | US$ 0 |
+| Domínio | — | `.com.br`: R$ 40/ano, cerca de R$ 3,33/mês. `.dev`: cerca de US$ 12,20/ano na renovação, cerca de US$ 1,02/mês |
+| **Total** | **R$ 0** | **cerca de R$ 3,33/mês (`.com.br`) ou US$ 1,02/mês (`.dev`)** |
+
+Para comparação: deixar a API sempre acordada custaria US$ 7/mês (instância 0,5 CPU e 512 MB), um worker separado mais US$ 7/mês, e um cron job do Render ao menos US$ 1/mês ([render.com/pricing](https://render.com/pricing.md)).
 
 ## Registro de decisões
 
