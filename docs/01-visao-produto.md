@@ -46,7 +46,7 @@ O projeto deve demonstrar:
 - Consulta, cancelamento e remarcação por link seguro.
 - Agenda da equipe, agendamento manual e registro do resultado do atendimento.
 - E-mails reais, com limites de envio.
-- Demo pública com login de demonstração e dados restaurados toda noite.
+- Demo pública com login de demonstração e dados restaurados todo dia.
 
 **Não inclui:**
 

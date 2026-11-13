@@ -33,7 +33,9 @@ services:
         condition: service_healthy
 
   # Same build and variables as the api. Without --reload: restart it after
-  # changing the code.
+  # changing the code. In production the API runs the same loop itself (D105,
+  # EMAIL_WORKER_IN_PROCESS); here it stays a service of its own. It also runs
+  # the daily cleanup of D115.
   worker:
     build: ./backend
     command: ["python", "-m", "app.jobs.email_worker"]

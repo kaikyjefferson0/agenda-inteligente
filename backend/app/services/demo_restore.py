@@ -36,7 +36,7 @@ from app.models import (
     User,
     WorkingHours,
 )
-from app.repositories import demo
+from app.repositories import demo, professionals
 from app.services import demo_content as content
 
 # D47: the reason left on the messages whose links stop working.
@@ -251,6 +251,12 @@ async def rebuild(
     The caller holds the lock of D45 and commits.
     """
     current = await find_demo_business(session)
+    if current is not None:
+        # The order of every request that writes to a schedule (professionals,
+        # then appointments): a booking under way finishes first, and a new one
+        # waits and then finds the new demo. Without it, an appointment written
+        # between the two deletions would make ON DELETE RESTRICT refuse this one.
+        await professionals.lock_all(session, current)
     failed_emails = await demo.fail_pending_emails(
         session,
         current,
@@ -263,5 +269,9 @@ async def rebuild(
     today = now.astimezone(ZoneInfo(content.TIMEZONE)).date()
     created: dict[str, int] = {}
     for model, rows in build_rows(today, password_hashes):
+        if model is Business:
+            # D106: the business stamps the restoration with the job's clock,
+            # the same `now` that dated the appointments.
+            rows = [{**row, "created_at": now} for row in rows]
         created[model.__tablename__] = await demo.insert_rows(session, model, rows)
     return DemoRestoreReport(deleted, created, failed_emails)

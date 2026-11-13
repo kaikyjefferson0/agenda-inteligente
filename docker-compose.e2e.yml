@@ -12,6 +12,10 @@ x-backend-env: &backend-env
   # No worker in the E2E: the link comes from the success screen, and the fake
   # backend guarantees no message ever leaves (docs/05).
   EMAIL_BACKEND: fake
+  # D105 and D106: written out, so the E2E never gets them from elsewhere. A
+  # restoration in the middle of a run would end the sessions (D47).
+  EMAIL_WORKER_IN_PROCESS: "false"
+  DEMO_RESTORE_IN_PROCESS: "false"
   DEMO_PASSWORD: senha-da-demo-somente-e2e
   REGISTRATION_ENABLED: "false"
   CORS_ALLOWED_ORIGINS: http://localhost:5175

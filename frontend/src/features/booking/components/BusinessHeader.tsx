@@ -21,7 +21,7 @@ export function BusinessHeader({ business }: { business: PublicBusiness }) {
           <InfoIcon aria-hidden="true" />
           <AlertTitle>Este é um negócio de demonstração</AlertTitle>
           <AlertDescription>
-            Pode agendar à vontade: os dados voltam ao estado inicial toda noite. Use um e-mail seu:
+            Pode agendar à vontade: os dados voltam ao estado inicial todo dia. Use um e-mail seu:
             a confirmação vai para o endereço informado.
           </AlertDescription>
         </Alert>

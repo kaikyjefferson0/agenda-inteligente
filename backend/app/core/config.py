@@ -4,6 +4,8 @@ from typing import Literal, Self
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings
 
+from app.domain.auth import PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH
+
 MIN_SECRET_LENGTH = 32
 
 
@@ -33,6 +35,11 @@ class Settings(BaseSettings):
     # D44 and D46: the password of both demo accounts. Optional for the API;
     # the restoration job refuses to run without a valid one (RN30).
     demo_password: SecretStr | None = None
+    # D105 and D106: background tasks inside the API process, for hosts without
+    # a worker of their own. Independent, so a real installation can send its
+    # e-mails without ever turning on the demo restoration.
+    email_worker_in_process: bool = False
+    demo_restore_in_process: bool = False
 
     @model_validator(mode="after")
     def _require_resend_key(self) -> Self:
@@ -41,6 +48,19 @@ class Settings(BaseSettings):
             self.resend_api_key is None or not self.resend_api_key.get_secret_value()
         ):
             raise ValueError("RESEND_API_KEY is required when EMAIL_BACKEND=resend")
+        return self
+
+    @model_validator(mode="after")
+    def _require_demo_password(self) -> Self:
+        """D106: the daily restoration fails at startup, not every 10 minutes."""
+        if not self.demo_restore_in_process:
+            return self
+        password = self.demo_password.get_secret_value() if self.demo_password else ""
+        if not PASSWORD_MIN_LENGTH <= len(password) <= PASSWORD_MAX_LENGTH:
+            raise ValueError(
+                "DEMO_RESTORE_IN_PROCESS requires a DEMO_PASSWORD of "
+                f"{PASSWORD_MIN_LENGTH} to {PASSWORD_MAX_LENGTH} characters"
+            )
         return self
 
     @property

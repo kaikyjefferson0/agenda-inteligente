@@ -110,6 +110,8 @@ O padrão outbox grava o e-mail na mesma transação da operação, então nenhu
 - **Expiração:** mensagem `pending` criada há mais de 24 horas vira `failed` com `last_error = "expired"`, sem envio. Um aviso de horário atrasado demais já não ajuda o cliente.
 - **Payload:** o worker apaga o `payload` na mesma escrita que muda o status para `sent` ou para `failed`, porque ele pode conter um token bruto. Uma restrição `CHECK` no banco recusa a escrita que não fizer isso. `sent_at` é preenchido no envio.
 - **Logs (D40):** o worker registra apenas `id`, template, status e número da tentativa. `last_error` guarda só o tipo do erro e o código HTTP, como `"HTTPStatusError 503"`, com no máximo 200 caracteres; nunca o destinatário, o link, o `payload` nem o corpo da resposta do provedor.
+- **Onde roda (D105):** no desenvolvimento, no serviço `worker` do `docker-compose.yml`, com `python -m app.jobs.email_worker`; em produção, numa tarefa dentro do processo da API, ligada por `EMAIL_WORKER_IN_PROCESS` (ver [Produção](#worker-de-e-mails-d105)). É o mesmo laço (`serve()`) nos dois casos.
+- **Limpeza diária (D115):** o mesmo laço, no primeiro ciclo e depois uma vez por dia (ou uma hora depois de uma falha), apaga as janelas de contador iniciadas há mais de 2 dias e as mensagens `sent` e `failed` criadas há mais de 30 dias, em `app/jobs/cleanup.py`, numa transação própria. Fica no worker porque toda instalação tem um, e a restauração da demo fica desligada numa instalação real. Uma falha na limpeza vai para o log e nunca para os envios.
 - **Adaptadores (D34):** o worker só conhece a interface `EmailSender`. `EMAIL_BACKEND` escolhe entre `smtp` (Mailpit no desenvolvimento), `fake` (mensagens em memória, nos testes) e `resend` (produção). Os textos vêm de funções puras em `app/email/`, em português, com os nomes digitados pelo Dono escapados no HTML (D37).
 
 ### Restauração da demo
@@ -117,7 +119,7 @@ O padrão outbox grava o e-mail na mesma transação da operação, então nenhu
 A tarefa `python -m app.jobs.restore_demo` (RN29) recria o negócio demo. A função `restore_demo(session, settings, now)` faz todo o trabalho e pode ser testada; o `main()` só abre a sessão e termina com código 0, ou 1 quando a restauração é recusada. Ela cria a demo se ela não existir, e rodá-la de novo no mesmo dia produz os mesmos dados.
 
 - **Senha (D46):** sem `DEMO_PASSWORD` de 12 a 128 caracteres (RN30), a tarefa termina antes de acessar o banco. Os dois hashes Argon2 são calculados antes da transação, para mantê-la curta.
-- **Trava (D45):** a transação começa com `pg_advisory_xact_lock` sobre uma chave fixa. Uma segunda execução simultânea espera e, ao continuar, encontra os dados da primeira.
+- **Trava (D45):** a transação começa com `pg_advisory_xact_lock` sobre uma chave fixa. Uma segunda execução simultânea espera e, ao continuar, encontra os dados da primeira. Em seguida, a tarefa trava os profissionais da demo, na ordem de id, como toda requisição que escreve numa agenda: um agendamento em andamento termina antes, e um novo espera o commit e encontra a demo nova, em vez de o `ON DELETE RESTRICT` recusar a restauração por um agendamento gravado no meio dela.
 - **Verificação (D46):** antes de qualquer escrita, a tarefa recusa mais de um negócio com `is_demo = true`, o `slug` `barbearia-demo` em um negócio que não é a demo e um e-mail das contas da demo em um usuário de outro negócio. Recusada, ela desfaz a transação sem ter apagado nada.
 - **Fila (D47):** mensagens `pending` para `@demo.example.com` ou para os e-mails `@example.com` dos clientes da demo viram `failed`, com `last_error = "demo_restored"` e `payload` nulo, porque os links deixariam de funcionar. A fila não tem `business_id`, então a escolha é pelo destinatário.
 - **Exclusão (D42):** como as chaves estrangeiras usam `ON DELETE RESTRICT`, os dados do negócio demo são apagados dos dependentes para o negócio: agendamentos, bloqueios, expediente, serviços dos profissionais, profissionais, serviços, tokens de conta, tokens de refresh, usuários e o negócio. Sem os tokens, as sessões anteriores deixam de valer, e quem estava logado entra de novo.
@@ -125,6 +127,8 @@ A tarefa `python -m app.jobs.restore_demo` (RN29) recria o negócio demo. A fun�
 - **Logs (D49):** apenas as quantidades apagadas e criadas por tabela, as mensagens retiradas da fila e a duração; nunca nomes, e-mails ou senhas.
 
 Tudo acontece em uma única transação: uma falha no meio deixa a demo anterior intacta.
+
+Em produção, a própria API restaura a demo uma vez por dia, depois das 03:00 de `America/Sao_Paulo`, com `restore_demo_if_due`, que confere a data antes e de novo sob a trava, e `DEMO_RESTORE_IN_PROCESS` liga isso (D106, em [Produção](#restauração-diária-da-demo-d106)). O negócio demo grava no `created_at` o relógio da restauração, e é por ele que a API sabe de que dia é a demo.
 
 ## Segurança
 
@@ -178,9 +182,9 @@ A demo guarda apenas nome, e-mail e telefone do agendamento, e a restauração n
 
 ## Ambiente local
 
-O `docker-compose.yml` sobe `db`, `api`, `worker`, `mailpit` e `frontend`. O `worker` usa o mesmo build e as mesmas variáveis da `api` e roda `python -m app.jobs.email_worker`; ele para de forma limpa com `SIGTERM` e `SIGINT`. Em desenvolvimento, o e-mail vai por SMTP ao Mailpit, um servidor de e-mail falso cuja interface web, em `http://localhost:8025`, mostra as mensagens enviadas. As portas do Mailpit (8025 e 1025) ficam publicadas só em `127.0.0.1`. Nada é gravado no log, porque as mensagens levam links com token e o e-mail do cliente (D35). A restauração da demo não tem serviço próprio: roda sob demanda, com `docker compose run --rm api python -m app.jobs.restore_demo`. Os segredos ficam em variáveis de ambiente, e o repositório inclui somente um `.env.example`.
+O `docker-compose.yml` sobe `db`, `api`, `worker`, `mailpit` e `frontend`. O `worker` usa o mesmo build e as mesmas variáveis da `api` e roda `python -m app.jobs.email_worker`; ele para de forma limpa com `SIGTERM` e `SIGINT` e faz também a limpeza diária da D115. Localmente, `EMAIL_WORKER_IN_PROCESS` e `DEMO_RESTORE_IN_PROCESS` ficam em `false`: o `worker` próprio envia os e-mails, e a API não roda nenhuma tarefa em segundo plano. Em desenvolvimento, o e-mail vai por SMTP ao Mailpit, um servidor de e-mail falso cuja interface web, em `http://localhost:8025`, mostra as mensagens enviadas. As portas do Mailpit (8025 e 1025) ficam publicadas só em `127.0.0.1`. Nada é gravado no log, porque as mensagens levam links com token e o e-mail do cliente (D35). A restauração da demo não tem serviço próprio: roda sob demanda, com `docker compose run --rm api python -m app.jobs.restore_demo`. Os segredos ficam em variáveis de ambiente, e o repositório inclui somente um `.env.example`.
 
-Os testes de ponta a ponta usam outro arquivo, o `docker-compose.e2e.yml`, num projeto próprio (`agenda-e2e`) com as portas 5175 (build de produção do frontend) e 8003 (API) e um banco `agenda_e2e` em memória, recriado a cada execução por `python -m app.scripts.prepare_e2e_database`, que recusa um banco sem `_e2e` no nome (D102). `npm run test:e2e`, no frontend, faz tudo.
+Os testes de ponta a ponta usam outro arquivo, o `docker-compose.e2e.yml`, num projeto próprio (`agenda-e2e`) com as portas 5175 (build de produção do frontend) e 8003 (API) e um banco `agenda_e2e` em memória, recriado a cada execução por `python -m app.scripts.prepare_e2e_database`, que recusa um banco sem `_e2e` no nome (D102). Lá, as duas variáveis ficam em `false`, escritas no próprio arquivo: não há worker, e uma restauração no meio dos testes derrubaria as sessões (D47). `npm run test:e2e`, no frontend, faz tudo.
 
 Variáveis principais:
 
@@ -199,6 +203,8 @@ Variáveis principais:
 | `FRONTEND_BASE_URL` | Base dos links enviados por e-mail |
 | `TRUSTED_CLIENT_IP_HEADER` | Cabeçalho com o IP do cliente, definido pelo proxy da hospedagem; vazio sem proxy |
 | `DEMO_PASSWORD` | Senha das contas da demo, de 12 a 128 caracteres; opcional para a API e obrigatória para a restauração da demo |
+| `EMAIL_WORKER_IN_PROCESS` | `true` faz a API enviar a fila de e-mails numa tarefa própria (D105); padrão `false`. Só em produção, onde não há o serviço `worker` |
+| `DEMO_RESTORE_IN_PROCESS` | `true` faz a API restaurar a demo uma vez por dia (D106); padrão `false`. Só na instalação da demo pública, nunca numa real; ligada, a API não sobe sem um `DEMO_PASSWORD` válido |
 | `VITE_DEMO_PASSWORD` | Build do frontend: senha do atalho da demonstração em `/entrar` (D75). Pública, como toda variável `VITE_`; só a senha da demo, nunca a de uma conta real. Vazia, o atalho some |
 
 ## CI (GitHub Actions)
@@ -220,7 +226,7 @@ API e site no Render (plano gratuito), banco no Neon (gratuito) e e-mails pelo R
 
 ## Produção
 
-Deploy aprovado na etapa do plano de deploy (D105 a D119, nos [Pontos a revisar](README.md#pontos-a-revisar)): API e site no Render (plano gratuito), banco no Neon (gratuito) e e-mails pelo Resend (gratuito), como o Estoque Inteligente, com o domínio próprio `kaikyjefferson.dev`, que também servirá aos outros projetos do responsável e será comprado na etapa do deploy. O site fica em `agenda.kaikyjefferson.dev` e a API em `api-agenda.kaikyjefferson.dev`. As mudanças de código e de configuração que as decisões pedem ficam para a etapa do deploy; até lá, o código segue como descrito no resto deste documento. Limites e preços foram conferidos na documentação oficial em 13/11/2026 e mudam com frequência; cada um tem a fonte.
+Deploy aprovado na etapa do plano de deploy (D105 a D119, nos [Pontos a revisar](README.md#pontos-a-revisar)): API e site no Render (plano gratuito), banco no Neon (gratuito) e e-mails pelo Resend (gratuito), como o Estoque Inteligente, com o domínio próprio `kaikyjefferson.dev`, que também servirá aos outros projetos do responsável e será comprado na etapa do deploy. O site fica em `agenda.kaikyjefferson.dev` e a API em `api-agenda.kaikyjefferson.dev`. O worker e a restauração dentro da API (D105 e D106), a limpeza diária (D115), o cookie, a conferência do `Origin`, os cabeçalhos de segurança e o `/health` sem banco já estão no código; o `render.yaml` e a configuração dos serviços ficam para a etapa do deploy. Limites e preços foram conferidos na documentação oficial em 13/11/2026 e mudam com frequência; cada um tem a fonte.
 
 ```mermaid
 flowchart LR
@@ -287,7 +293,7 @@ Sem valores reais: o Render e o Resend mostram cada valor no painel, e os nomes 
 
 | Opção | Custo | O que muda no código |
 |---|---|---|
-| **A. Worker dentro do processo da API** | Grátis; complexidade baixa | O `lifespan` da API inicia `serve()` de `app/jobs/email_worker.py` numa tarefa `asyncio` e, no desligamento, aciona o `stop` e espera a tarefa. Uma variável (por exemplo, `EMAIL_WORKER_IN_PROCESS`, desligada por padrão) liga isso só em produção; o `docker-compose.yml` continua com o `worker` próprio |
+| **A. Worker dentro do processo da API** | Grátis; complexidade baixa | O `lifespan` da API inicia `serve()` de `app/jobs/email_worker.py` numa tarefa `asyncio` e, no desligamento, aciona o `stop` e espera a tarefa. `EMAIL_WORKER_IN_PROCESS`, desligada por padrão, liga isso só em produção; o `docker-compose.yml` continua com o `worker` próprio |
 | B. Background worker pago | US$ 7/mês | Nada; só o `render.yaml` |
 | C. GitHub Actions a cada 5 minutos rodando um ciclo | Grátis; complexidade média | Um modo "um ciclo e sai" e o workflow. Atrasos do `schedule`, desligamento depois de 60 dias e a URL do banco também no GitHub |
 | D. Enviar na própria requisição (`BackgroundTasks`) | Grátis | Contradiz a decisão do outbox (perde as retentativas e a garantia de "pelo menos uma vez") |
@@ -298,11 +304,18 @@ Sem valores reais: o Render e o Resend mostram cada valor no painel, e os nomes 
 
 **Decidido:** A.
 
+**Como ficou:** `app/jobs/in_process.py` tem o `background_tasks`, usado pelo `lifespan` de `app/main.py`. Ele cria um `stop` compartilhado e uma tarefa para cada variável ligada, e devolve o controle na hora: a porta abre sem esperar ciclo nenhum.
+
+- **Sem bloquear as requisições:** todo acesso ao banco, ao Resend (httpx) e ao SMTP (numa thread) é assíncrono, e o Argon2 da restauração roda numa thread. O worker usa o mesmo pool de conexões da API, uma conexão por vez. Um teste prende um envio e confere que `/health` responde enquanto isso.
+- **Uma falha não derruba a API:** o ciclo trata o erro do adaptador (até um erro inesperado vira falha temporária) e o erro do ciclo inteiro, como o banco fora do ar, registrando só o tipo (D40). Uma tarefa que morra mesmo assim vai para o log como `critical`, e a API e a outra tarefa continuam.
+- **Desligamento:** no `SIGTERM`, o uvicorn para de aceitar conexões, espera as requisições em andamento e roda o fim do `lifespan`, que aciona o `stop`. O laço sai entre lotes, ou na hora, se estiver na espera de 5 s. O que ainda estiver rodando depois de 10 s, dentro dos 30 s que o Render espera, é cancelado; a mensagem cancelada no meio do envio continua reservada e volta quando a reserva vence (D38), com o mesmo `id` como chave de idempotência no Resend.
+- **Ao acordar com e-mails na fila:** a requisição que acordou a API sobe o processo (migrações, uvicorn, `lifespan`) e é atendida enquanto o primeiro ciclo já roda. Ele pega as mensagens `pending` vencidas, as mais antigas primeiro, em lotes de 20 seguidos enquanto vierem cheios; a com mais de 24 horas vira `failed` com `expired`, sem envio; a que o processo adormecido reservou e não gravou é pega de novo, porque a reserva venceu; uma retentativa marcada para mais tarde espera a hora dela.
+
 #### Restauração diária da demo (D106)
 
 | Opção | Custo | O que muda no código |
 |---|---|---|
-| **A. A API restaura quando a demo ficou de um dia anterior** | Grátis; complexidade média | Uma conferência no mesmo laço da D105, ao subir e a cada 10 minutos: se a data do `created_at` do negócio demo (recriado a cada restauração, com `server_default=now()`) em `America/Sao_Paulo` é anterior a hoje e já passou das 03:00, chama `restore_demo`. A conferência se repete sob a trava da D45. Roda em segundo plano, depois de a API abrir a porta, para não somar à partida a frio. Sem tabela nova |
+| **A. A API restaura quando a demo ficou de um dia anterior** | Grátis; complexidade média | Uma conferência no mesmo `lifespan` da D105, numa tarefa própria, ao subir e a cada 10 minutos: se a data do `created_at` do negócio demo (recriado a cada restauração, com `server_default=now()`) em `America/Sao_Paulo` é anterior a hoje e já passou das 03:00, chama `restore_demo`. A conferência se repete sob a trava da D45. Roda em segundo plano, depois de a API abrir a porta, para não somar à partida a frio. Sem tabela nova |
 | B. GitHub Actions agendado rodando `restore_demo` contra o Neon | Grátis; complexidade baixa | Só um workflow, com `DATABASE_URL` e `DEMO_PASSWORD` nos segredos do GitHub |
 | C. Cron job do Render | Mínimo de US$ 1/mês | Nada; só o `render.yaml` |
 | D. Restaurar só ao subir, se passou de 24 horas (como o Estoque) | Grátis | Como A, sem a conferência periódica |
@@ -310,6 +323,15 @@ Sem valores reais: o Render e o Resend mostram cada valor no painel, e os nomes 
 A demo é restaurada na primeira visita depois das 03:00 (ou na primeira conferência, se a API já estiver acordada), então quem visita sempre vê dados do dia (RN29). O efeito da D47 continua: quem estava logado na demo entra de novo. Em B, o desligamento depois de 60 dias sem atividade é provável num projeto de portfólio parado, e a demo envelheceria em silêncio.
 
 **Decidido:** A, com a restauração manual pela máquina local documentada para emergências. O aviso da D48 passa de "toda noite" a "todo dia".
+
+**Como ficou:** uma tarefa própria no mesmo `lifespan` e com o mesmo `stop` da D105, ligada por `DEMO_RESTORE_IN_PROCESS`, independente de `EMAIL_WORKER_IN_PROCESS`. Assim uma instalação real envia e-mails sem nunca restaurar a demo, a restauração não atrasa os envios, e a falha de uma tarefa não derruba a outra. Com a variável ligada, a API não sobe sem um `DEMO_PASSWORD` válido, para o erro aparecer no deploy e não a cada 10 minutos no log.
+
+- **Quando roda:** logo depois de a API subir e depois a cada 10 minutos, a tarefa lê o `created_at` do negócio demo, uma consulta barata. `restoration_due` (`app/domain/daily_jobs.py`) decide: restaura se não existe demo, ou se a data do `created_at` em `America/Sao_Paulo` é anterior a hoje e já passou das 03:00. Só então calcula os hashes Argon2 e chama `restore_demo_if_due`.
+- **Nunca duas ao mesmo tempo (D45):** num processo há uma tarefa só. Entre processos (a instância nova e a antiga convivem por um tempo num deploy, ou alguém roda `python -m app.jobs.restore_demo` da máquina local), o `pg_advisory_xact_lock` faz a segunda esperar; ao continuar, ela confere o `created_at` de novo sob a trava, encontra a demo de hoje, desfaz a transação e registra "demo already restored today". A restauração manual não confere a data: restaura sempre.
+- **Falhas:** uma recusa da D46 ou o banco fora do ar vão para o log e esperam a próxima conferência; nada sai da tarefa.
+- **Uma requisição durante a restauração:** a transação dura cerca de 0,2 s nos testes, porque o Argon2 roda antes da trava. As leituras (página pública, horários, agenda) não esperam: pelo MVCC, veem a demo antiga até o commit e a nova depois. Uma escrita na demo, como um agendamento público, espera a trava dos profissionais e, depois do commit, roda sobre a demo nova; o teste confere um `201` no mesmo dia, e em outro dia o horário poderia estar ocupado (`409 SLOT_UNAVAILABLE`). Um refresh ou uma sessão anterior deixa de valer, como já dizia a D47.
+- **Limpeza (D115):** depois de cada restauração, numa transação própria, para que uma falha nela nunca desfaça a demo. Ela também roda no worker uma vez por dia, porque numa instalação real esta tarefa fica desligada.
+
 
 #### Cookie, CORS e CSRF com o domínio próprio (D108 a D110)
 
@@ -337,7 +359,7 @@ O site, estático na CDN, abre na hora; a API leva cerca de um minuto para acord
 
 - **Migrações (D113):** sem pre-deploy no plano grátis, o comando de início é `alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1`, como no Estoque. Uma migração que falha impede a API de subir, e o Render mantém a versão anterior. Roda também quando a API acorda, sem custo quando não há migração pendente. Sempre pela conexão direta do Neon, que recomenda não usar o pooler em migrações ([connection-pooling](https://neon.com/docs/connect/connection-pooling)).
 - **Build (D114):** API no runtime Python nativo, com `rootDir: backend`. O Render instala o uv quando há `uv.lock` na raiz do serviço ([python-version](https://render.com/docs/python-version), [uv-version](https://render.com/docs/uv-version)). Build `uv sync --frozen --no-dev`, com `PYTHON_VERSION=3.14.10` e `UV_VERSION=0.13.7`, as versões do `Dockerfile`, que é de desenvolvimento e não é usado no deploy. Site: `rootDir: frontend`, `npm ci && npm run build`, publica `dist`, `NODE_VERSION=24.22.2` e a regra `/*` → `/index.html` para as rotas do React. Tudo num `render.yaml` sem segredos. Depois de os domínios funcionarem, o endereço `onrender.com` dos dois serviços é desligado (`renderSubdomainPolicy`), para existir um só endereço de cada um.
-- **Banco (D115):** um projeto Neon próprio em AWS `us-east-1` (ao lado de Virginia, a região da API), com o compute fixo em 0,25 CU. `DATABASE_URL` pela conexão direta, sem `-pooler`. O Neon entrega `postgresql://…?sslmode=require&channel_binding=require`; para o asyncpg pelo SQLAlchemy, o formato a testar é `postgresql+asyncpg://…?ssl=require`, sem `channel_binding`, porque o asyncpg trata opções desconhecidas como configurações do servidor ([asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html)). O `pool_pre_ping=True` já cobre as conexões que o Neon fecha ao dormir. Os contadores de limite e a fila nunca são apagados hoje; a restauração diária passa a apagar as janelas de contador encerradas há mais de um dia e as mensagens `sent` e `failed` com mais de 30 dias, para ficar longe de 1 GB.
+- **Banco (D115):** um projeto Neon próprio em AWS `us-east-1` (ao lado de Virginia, a região da API), com o compute fixo em 0,25 CU. `DATABASE_URL` pela conexão direta, sem `-pooler`. O Neon entrega `postgresql://…?sslmode=require&channel_binding=require`; para o asyncpg pelo SQLAlchemy, o formato a testar é `postgresql+asyncpg://…?ssl=require`, sem `channel_binding`, porque o asyncpg trata opções desconhecidas como configurações do servidor ([asyncpg](https://magicstack.github.io/asyncpg/current/api/index.html)). O `pool_pre_ping=True` já cobre as conexões que o Neon fecha ao dormir. Para ficar longe de 1 GB, a limpeza diária apaga as janelas de contador encerradas há mais de um dia e as mensagens `sent` e `failed` com mais de 30 dias. Ela roda no laço do worker, que toda instalação tem, e não depende da restauração, que fica desligada numa instalação real; na demo, roda também logo depois de cada restauração, numa transação própria.
 
 #### Segredos e variáveis (D116)
 

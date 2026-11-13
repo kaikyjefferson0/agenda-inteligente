@@ -101,7 +101,10 @@ describe('business page (UC10)', () => {
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Barbearia Demo' })).toBeInTheDocument()
     // Information, not an error: a status, never an alert.
-    expect(screen.getByText('Este é um negócio de demonstração').closest('[role="status"]')).toBeInTheDocument()
+    const notice = screen.getByText('Este é um negócio de demonstração').closest('[role="status"]')
+    expect(notice).toBeInTheDocument()
+    // D106: the API restores the demo once a day, after 03:00, at the first visit.
+    expect(notice).toHaveTextContent('os dados voltam ao estado inicial todo dia')
     expect(screen.getByRole('heading', { level: 2, name: 'Escolha o serviço' })).toBeInTheDocument()
 
     const corte = screen.getByRole('radio', { name: 'Corte' })
