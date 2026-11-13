@@ -23,6 +23,7 @@ from app.domain.auth import (
     RefreshTokenState,
     classify_refresh_token,
     is_account_token_usable,
+    is_invitation_pending,
     refresh_token_expiry,
 )
 from app.domain.rate_limits import seconds_until_window_end, window_start
@@ -48,6 +49,30 @@ EARLIER = NOW - timedelta(days=1)
 )
 def test_classifies_refresh_token(used_at, revoked_at, expires_at, expected) -> None:
     assert classify_refresh_token(used_at, revoked_at, expires_at, NOW) is expected
+
+
+@mark.parametrize(
+    ("is_professional", "has_password", "is_active", "expected"),
+    [
+        (True, False, True, True),
+        # Accepted: the link was used.
+        (True, True, True, False),
+        # D96: deactivated before accepting is never pending.
+        (True, False, False, False),
+        (True, True, False, False),
+        # The Owner always has a password, but the role alone already excludes it.
+        (False, False, True, False),
+        (False, True, True, False),
+    ],
+)
+def test_invitation_is_pending_only_while_it_can_be_accepted(
+    is_professional: bool, has_password: bool, is_active: bool, expected: bool
+) -> None:
+    pending = is_invitation_pending(
+        is_professional=is_professional, has_password=has_password, is_active=is_active
+    )
+
+    assert pending is expected
 
 
 def test_refresh_expiry_slides_with_each_use() -> None:

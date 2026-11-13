@@ -76,6 +76,12 @@ PROBLEMS: dict[ErrorCode, Problem] = {
     ErrorCode.TIME_BLOCK_OVERLAP: Problem(
         409, "Bloqueio sobreposto", "Já existe um bloqueio nesse período."
     ),
+    ErrorCode.INVITATION_NOT_PENDING: Problem(
+        409,
+        "Convite não pendente",
+        "Só um convite ainda pendente pode ser cancelado: este já foi aceito, "
+        "ou a conta foi desativada.",
+    ),
     ErrorCode.EMAIL_IN_USE: Problem(
         409, "E-mail em uso", "Este e-mail já está em uso."
     ),

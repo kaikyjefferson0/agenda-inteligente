@@ -14,7 +14,19 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "DATABASE_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
               }
             }
           }
@@ -50,11 +62,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -91,11 +103,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -156,11 +168,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -214,11 +226,11 @@
             "description": "Successful Response"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -279,11 +291,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -313,11 +325,11 @@
             "description": "Successful Response"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -347,11 +359,11 @@
             "description": "Successful Response"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -412,11 +424,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -486,11 +498,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -549,11 +561,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -620,11 +632,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -656,7 +668,14 @@
             }
           },
           "200": {
-            "description": "O registro já existia"
+            "description": "O registro já existia e voltou a atender",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfessionalData"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -664,6 +683,48 @@
             "HTTPBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/professionals/{professional_id}/invitation": {
+      "delete": {
+        "tags": [
+          "professionals"
+        ],
+        "summary": "Cancel Invitation",
+        "description": "D96: only a pending invite; the e-mail is free for a new one.",
+        "operationId": "cancel_invitation_api_v1_professionals__professional_id__invitation_delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "professional_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Professional Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/professionals/{professional_id}/deactivate": {
@@ -694,12 +755,22 @@
           "204": {
             "description": "Successful Response"
           },
-          "422": {
-            "description": "Validation Error",
+          "409": {
+            "description": "APPOINTMENT_CONFLICTS: há agendamentos futuros confirmados (RN23)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/AppointmentConflictsProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -753,11 +824,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -801,11 +872,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -857,11 +928,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -909,11 +980,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -964,12 +1035,37 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "409": {
+            "description": "APPOINTMENT_CONFLICTS, com a lista (RN21), que tem prioridade, ou TIME_BLOCK_OVERLAP",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AppointmentConflictsProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TimeBlockOverlapProblem"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "code",
+                    "mapping": {
+                      "APPOINTMENT_CONFLICTS": "#/components/schemas/AppointmentConflictsProblem",
+                      "TIME_BLOCK_OVERLAP": "#/components/schemas/TimeBlockOverlapProblem"
+                    }
+                  },
+                  "title": "Response 409 Create Time Block Api V1 Professionals  Professional Id  Time Blocks Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1006,11 +1102,11 @@
             "description": "Successful Response"
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1085,11 +1181,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1139,11 +1235,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1207,11 +1303,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1255,11 +1351,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1303,11 +1399,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1351,11 +1447,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1393,11 +1489,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1472,11 +1568,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1534,14 +1630,21 @@
             }
           },
           "200": {
-            "description": "Repetição idempotente"
-          },
-          "422": {
-            "description": "Validation Error",
+            "description": "Repetição idempotente (RN13)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/BookingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1579,11 +1682,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1621,11 +1724,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1673,11 +1776,11 @@
             }
           },
           "422": {
-            "description": "Validation Error",
+            "description": "VALIDATION_ERROR, com os campos recusados em `errors`",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ValidationProblem"
                 }
               }
             }
@@ -1710,6 +1813,51 @@
           "password"
         ],
         "title": "AcceptInvitationRequest"
+      },
+      "AppointmentConflictsProblem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "integer",
+            "const": 409,
+            "title": "Status"
+          },
+          "code": {
+            "type": "string",
+            "const": "APPOINTMENT_CONFLICTS",
+            "title": "Code"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/AppointmentData"
+            },
+            "type": "array",
+            "title": "Conflicts",
+            "description": "Os agendamentos a resolver antes, sem contato do cliente"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail",
+          "conflicts"
+        ],
+        "title": "AppointmentConflictsProblem",
+        "description": "A block over appointments (RN21) or a deactivation with future ones (RN23)."
       },
       "AppointmentData": {
         "properties": {
@@ -2472,6 +2620,69 @@
         ],
         "title": "CustomerData"
       },
+      "ErrorCode": {
+        "type": "string",
+        "enum": [
+          "INVALID_TOKEN",
+          "INVALID_CREDENTIALS",
+          "NOT_AUTHENTICATED",
+          "INVALID_REFRESH_TOKEN",
+          "FORBIDDEN",
+          "REGISTRATION_DISABLED",
+          "DEMO_RESTRICTED",
+          "NOT_FOUND",
+          "SLOT_UNAVAILABLE",
+          "CHANGE_DEADLINE_PASSED",
+          "INVALID_STATUS_TRANSITION",
+          "IDEMPOTENCY_KEY_REUSED",
+          "APPOINTMENT_CONFLICTS",
+          "TIME_BLOCK_OVERLAP",
+          "INVITATION_NOT_PENDING",
+          "EMAIL_IN_USE",
+          "SLUG_IN_USE",
+          "VALIDATION_ERROR",
+          "RATE_LIMITED",
+          "DATABASE_UNAVAILABLE",
+          "HTTP_ERROR",
+          "INTERNAL_ERROR"
+        ],
+        "title": "ErrorCode"
+      },
+      "FieldErrorData": {
+        "properties": {
+          "loc": {
+            "description": "Onde: `body`, `query`, `path` ou `header`, seguido do campo",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Loc",
+            "type": "array"
+          },
+          "msg": {
+            "description": "Em inglês; o frontend mostra o próprio texto",
+            "title": "Msg",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "FieldErrorData",
+        "type": "object"
+      },
       "ForgotPasswordRequest": {
         "properties": {
           "email": {
@@ -2487,18 +2698,25 @@
         ],
         "title": "ForgotPasswordRequest"
       },
-      "HTTPValidationError": {
+      "HealthResponse": {
         "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "const": "ok",
+            "title": "Database"
           }
         },
         "type": "object",
-        "title": "HTTPValidationError"
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "HealthResponse"
       },
       "IntervalData": {
         "properties": {
@@ -2710,6 +2928,39 @@
         ],
         "title": "OwnerRegistration"
       },
+      "Problem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          },
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail"
+        ],
+        "title": "Problem",
+        "description": "The generic problem, with a stable `code`."
+      },
       "ProfessionalData": {
         "properties": {
           "id": {
@@ -2740,7 +2991,21 @@
           },
           "invitation_pending": {
             "type": "boolean",
-            "title": "Invitation Pending"
+            "title": "Invitation Pending",
+            "description": "O convite ainda pode ser aceito: conta de profissional ativa e sem senha. Uma conta desativada nunca está pendente (D96)"
+          },
+          "invitation_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invitation Expires At",
+            "description": "Quando vence o link do convite pendente, em UTC (RN24, 7 dias). No passado, o convite venceu e pode ser renovado. Nulo sem convite pendente (D95)"
           },
           "service_ids": {
             "items": {
@@ -2760,6 +3025,7 @@
           "is_bookable",
           "is_active",
           "invitation_pending",
+          "invitation_expires_at",
           "service_ids"
         ],
         "title": "ProfessionalData"
@@ -3494,6 +3760,42 @@
         ],
         "title": "TimeBlockData"
       },
+      "TimeBlockOverlapProblem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "integer",
+            "const": 409,
+            "title": "Status"
+          },
+          "code": {
+            "type": "string",
+            "const": "TIME_BLOCK_OVERLAP",
+            "title": "Code"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail"
+        ],
+        "title": "TimeBlockOverlapProblem",
+        "description": "A block over another block; without a list."
+      },
       "UpdateBusinessRequest": {
         "properties": {
           "name": {
@@ -3653,45 +3955,49 @@
         ],
         "title": "UserRole"
       },
-      "ValidationError": {
+      "ValidationProblem": {
+        "description": "Every 422, from the framework or from a rule that needs stored values.",
         "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
           "type": {
-            "type": "string",
-            "title": "Error Type"
+            "title": "Type",
+            "type": "string"
           },
-          "input": {
-            "title": "Input"
+          "title": {
+            "title": "Title",
+            "type": "string"
           },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
+          "status": {
+            "const": 422,
+            "title": "Status",
+            "type": "integer"
+          },
+          "code": {
+            "const": "VALIDATION_ERROR",
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/FieldErrorData"
+            },
+            "title": "Errors",
+            "type": "array"
           }
         },
-        "type": "object",
         "required": [
-          "loc",
-          "msg",
-          "type"
+          "type",
+          "title",
+          "status",
+          "code",
+          "detail",
+          "errors"
         ],
-        "title": "ValidationError"
+        "title": "ValidationProblem",
+        "type": "object"
       },
       "WorkingHoursInterval": {
         "properties": {

@@ -8,12 +8,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.security import hash_password
-from app.domain.auth import INVITE_TTL
+from app.domain.auth import INVITE_TTL, is_invitation_pending
 from app.domain.errors import AppError, ErrorCode
 from app.domain.rate_limits import ACCOUNT_TOKEN_BY_IP, INVITATIONS_BY_BUSINESS
 from app.email.templates import EmailTemplate
 from app.models import AccountTokenPurpose, Business, Professional, User, UserRole
-from app.repositories import account_tokens, professionals, users
+from app.repositories import (
+    account_tokens,
+    email_outbox,
+    professionals,
+    refresh_tokens,
+    users,
+)
 from app.services.account_tokens import (
     enqueue_email,
     get_usable_account_token,
@@ -25,6 +31,17 @@ from app.services.rate_limits import (
     enforce_rate_limit,
     seconds_until_email_quota_resets,
 )
+
+# D96: why a cancelled invite's e-mail, still in the outbox, never went out.
+INVITATION_CANCELLED = "invitation_cancelled"
+
+
+def _is_pending(user: User) -> bool:
+    return is_invitation_pending(
+        is_professional=user.role is UserRole.PROFESSIONAL,
+        has_password=user.password_hash is not None,
+        is_active=user.is_active,
+    )
 
 
 @dataclass(frozen=True)
@@ -41,12 +58,7 @@ async def _create_or_renew_invitee(
     if existing is not None:
         # Only a pending invite of this same business can be renewed. Anything
         # else belongs to someone else and must stay untouched.
-        if (
-            existing.business_id != business_id
-            or existing.role is not UserRole.PROFESSIONAL
-            or existing.password_hash is not None
-            or not existing.is_active
-        ):
+        if existing.business_id != business_id or not _is_pending(existing):
             raise AppError(ErrorCode.EMAIL_IN_USE)
         professional = await professionals.get_by_user(
             session, business_id, existing.id
@@ -147,7 +159,7 @@ async def accept_invitation(
 
     user = await users.lock_by_id_for_auth(session, user_id)
     token = await lock_usable_account_token(session, raw_token, purpose, now)
-    if user is None or not user.is_active or user.password_hash is not None:
+    if user is None or not _is_pending(user):
         raise AppError(ErrorCode.INVALID_TOKEN)
     professional = await professionals.get_by_user(session, user.business_id, user.id)
     if professional is None:
@@ -156,4 +168,38 @@ async def accept_invitation(
     user.password_hash = password_hash
     token.used_at = now
     professional.is_bookable = True
+    await session.commit()
+
+
+async def cancel_invitation(
+    session: AsyncSession, *, business: Business, professional_id: UUID
+) -> None:
+    """D96: deletes the pending account and its record, freeing the e-mail.
+
+    The invite token goes with the account, so the old link answers like any
+    invalid one. The invite e-mail still waiting in the outbox never goes out.
+    """
+    if business.is_demo:  # RN28: invites are off in the demo.
+        raise AppError(ErrorCode.DEMO_RESTRICTED)
+    found = await professionals.get(session, business.id, professional_id)
+    if found is None:
+        raise AppError(ErrorCode.NOT_FOUND)
+
+    # User before professional, like accepting and deactivating. Under the lock,
+    # an accept that got there first already set the password.
+    user = await users.lock_by_id_for_auth(session, found.user_id)
+    professional = await professionals.lock(session, business.id, professional_id)
+    if user is None or professional is None:
+        raise AppError(ErrorCode.NOT_FOUND)
+    if not _is_pending(user):
+        raise AppError(ErrorCode.INVITATION_NOT_PENDING)
+
+    await professionals.delete_with_schedule(session, business.id, professional_id)
+    await account_tokens.delete_for_user(session, user.id)
+    # A pending account never logged in; this only keeps the delete possible.
+    await refresh_tokens.delete_for_user(session, user.id)
+    await email_outbox.fail_pending_for_recipient(
+        session, user.email, EmailTemplate.ACCOUNT_INVITE, INVITATION_CANCELLED
+    )
+    await users.delete_pending_account(session, business.id, user.id)
     await session.commit()

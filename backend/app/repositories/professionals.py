@@ -5,7 +5,14 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Professional, ProfessionalService, Service, User
+from app.models import (
+    Professional,
+    ProfessionalService,
+    Service,
+    TimeBlock,
+    User,
+    WorkingHours,
+)
 
 
 async def get_by_user(
@@ -165,3 +172,27 @@ async def replace_services(
         for service_id in service_ids
     )
     await session.flush()
+
+
+async def delete_with_schedule(
+    session: AsyncSession, business_id: UUID, professional_id: UUID
+) -> None:
+    """Deletes the record with its services, working hours and time blocks.
+
+    Only for a pending invite (D96), which never takes bookings. Appointments are
+    left alone on purpose: if one existed, ON DELETE RESTRICT refuses the whole
+    deletion instead of erasing history.
+    """
+    for model in (ProfessionalService, WorkingHours, TimeBlock):
+        await session.execute(
+            delete(model).where(
+                model.business_id == business_id,
+                model.professional_id == professional_id,
+            )
+        )
+    await session.execute(
+        delete(Professional).where(
+            Professional.business_id == business_id,
+            Professional.id == professional_id,
+        )
+    )

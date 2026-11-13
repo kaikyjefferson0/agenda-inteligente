@@ -261,6 +261,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/professionals/{professional_id}/invitation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel Invitation
+         * @description D96: only a pending invite; the e-mail is free for a new one.
+         */
+        delete: operations["cancel_invitation_api_v1_professionals__professional_id__invitation_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/professionals/{professional_id}/deactivate": {
         parameters: {
             query?: never;
@@ -546,6 +566,33 @@ export interface components {
             token: string;
             /** Password */
             password: string;
+        };
+        /**
+         * AppointmentConflictsProblem
+         * @description A block over appointments (RN21) or a deactivation with future ones (RN23).
+         */
+        AppointmentConflictsProblem: {
+            /** Type */
+            type: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "APPOINTMENT_CONFLICTS";
+            /** Detail */
+            detail: string;
+            /**
+             * Conflicts
+             * @description Os agendamentos a resolver antes, sem contato do cliente
+             */
+            conflicts: components["schemas"]["AppointmentData"][];
         };
         /**
          * AppointmentData
@@ -932,6 +979,26 @@ export interface components {
             /** Phone */
             phone: string;
         };
+        /**
+         * ErrorCode
+         * @enum {string}
+         */
+        ErrorCode: "INVALID_TOKEN" | "INVALID_CREDENTIALS" | "NOT_AUTHENTICATED" | "INVALID_REFRESH_TOKEN" | "FORBIDDEN" | "REGISTRATION_DISABLED" | "DEMO_RESTRICTED" | "NOT_FOUND" | "SLOT_UNAVAILABLE" | "CHANGE_DEADLINE_PASSED" | "INVALID_STATUS_TRANSITION" | "IDEMPOTENCY_KEY_REUSED" | "APPOINTMENT_CONFLICTS" | "TIME_BLOCK_OVERLAP" | "INVITATION_NOT_PENDING" | "EMAIL_IN_USE" | "SLUG_IN_USE" | "VALIDATION_ERROR" | "RATE_LIMITED" | "DATABASE_UNAVAILABLE" | "HTTP_ERROR" | "INTERNAL_ERROR";
+        /** FieldErrorData */
+        FieldErrorData: {
+            /**
+             * Loc
+             * @description Onde: `body`, `query`, `path` ou `header`, seguido do campo
+             */
+            loc: (string | number)[];
+            /**
+             * Msg
+             * @description Em inglês; o frontend mostra o próprio texto
+             */
+            msg: string;
+            /** Type */
+            type: string;
+        };
         /** ForgotPasswordRequest */
         ForgotPasswordRequest: {
             /**
@@ -940,10 +1007,18 @@ export interface components {
              */
             email: string;
         };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
+        /** HealthResponse */
+        HealthResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "ok";
+            /**
+             * Database
+             * @constant
+             */
+            database: "ok";
         };
         /** IntervalData */
         IntervalData: {
@@ -1045,6 +1120,21 @@ export interface components {
             /** Password */
             password: string;
         };
+        /**
+         * Problem
+         * @description The generic problem, with a stable `code`.
+         */
+        Problem: {
+            /** Type */
+            type: string;
+            /** Title */
+            title: string;
+            /** Status */
+            status: number;
+            code: components["schemas"]["ErrorCode"];
+            /** Detail */
+            detail: string;
+        };
         /** ProfessionalData */
         ProfessionalData: {
             /**
@@ -1065,8 +1155,16 @@ export interface components {
             is_bookable: boolean;
             /** Is Active */
             is_active: boolean;
-            /** Invitation Pending */
+            /**
+             * Invitation Pending
+             * @description O convite ainda pode ser aceito: conta de profissional ativa e sem senha. Uma conta desativada nunca está pendente (D96)
+             */
             invitation_pending: boolean;
+            /**
+             * Invitation Expires At
+             * @description Quando vence o link do convite pendente, em UTC (RN24, 7 dias). No passado, o convite venceu e pode ser renovado. Nulo sem convite pendente (D95)
+             */
+            invitation_expires_at: string | null;
             /** Service Ids */
             service_ids: string[];
         };
@@ -1417,6 +1515,28 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /**
+         * TimeBlockOverlapProblem
+         * @description A block over another block; without a list.
+         */
+        TimeBlockOverlapProblem: {
+            /** Type */
+            type: string;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: 409;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            code: "TIME_BLOCK_OVERLAP";
+            /** Detail */
+            detail: string;
+        };
         /** UpdateBusinessRequest */
         UpdateBusinessRequest: {
             /** Name */
@@ -1481,18 +1601,29 @@ export interface components {
          * @enum {string}
          */
         UserRole: "owner" | "professional";
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
+        /**
+         * ValidationProblem
+         * @description Every 422, from the framework or from a rule that needs stored values.
+         */
+        ValidationProblem: {
+            /** Type */
             type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: 422;
+            /**
+             * Code
+             * @constant
+             */
+            code: "VALIDATION_ERROR";
+            /** Detail */
+            detail: string;
+            /** Errors */
+            errors: components["schemas"]["FieldErrorData"][];
         };
         /** WorkingHoursInterval */
         WorkingHoursInterval: {
@@ -1541,7 +1672,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description DATABASE_UNAVAILABLE */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
         };
@@ -1568,13 +1708,13 @@ export interface operations {
                     "application/json": components["schemas"]["SessionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1601,13 +1741,13 @@ export interface operations {
                     "application/json": components["schemas"]["SessionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1634,13 +1774,13 @@ export interface operations {
                     "application/json": components["schemas"]["SessionResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1665,13 +1805,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1718,13 +1858,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1749,13 +1889,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1780,13 +1920,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1833,13 +1973,13 @@ export interface operations {
                     "application/json": components["schemas"]["UpdateBusinessResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1886,13 +2026,13 @@ export interface operations {
                     "application/json": components["schemas"]["ServiceData"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1921,13 +2061,13 @@ export interface operations {
                     "application/json": components["schemas"]["ServiceData"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1974,13 +2114,13 @@ export interface operations {
                     "application/json": components["schemas"]["InvitationResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -1994,12 +2134,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description O registro já existia */
+            /** @description O registro já existia e voltou a atender */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ProfessionalData"];
+                };
             };
             /** @description Successful Response */
             201: {
@@ -2008,6 +2150,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfessionalData"];
+                };
+            };
+        };
+    };
+    cancel_invitation_api_v1_professionals__professional_id__invitation_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                professional_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2030,13 +2201,22 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description APPOINTMENT_CONFLICTS: há agendamentos futuros confirmados (RN23) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentConflictsProblem"];
+                };
+            };
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2065,13 +2245,13 @@ export interface operations {
                     "application/json": components["schemas"]["ProfessionalData"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2096,13 +2276,13 @@ export interface operations {
                     "application/json": components["schemas"]["WorkingHoursResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2131,13 +2311,13 @@ export interface operations {
                     "application/json": components["schemas"]["ReplaceWorkingHoursResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2162,13 +2342,13 @@ export interface operations {
                     "application/json": components["schemas"]["TimeBlockData"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2197,13 +2377,22 @@ export interface operations {
                     "application/json": components["schemas"]["TimeBlockData"];
                 };
             };
-            /** @description Validation Error */
+            /** @description APPOINTMENT_CONFLICTS, com a lista (RN21), que tem prioridade, ou TIME_BLOCK_OVERLAP */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppointmentConflictsProblem"] | components["schemas"]["TimeBlockOverlapProblem"];
+                };
+            };
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2226,13 +2415,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2259,13 +2448,13 @@ export interface operations {
                     "application/json": components["schemas"]["StaffAppointmentData"][];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2301,13 +2490,13 @@ export interface operations {
                     "application/json": components["schemas"]["StaffConflictProblem"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2345,13 +2534,13 @@ export interface operations {
                     "application/json": components["schemas"]["StaffConflictProblem"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2376,13 +2565,13 @@ export interface operations {
                     "application/json": components["schemas"]["StaffChangeResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2407,13 +2596,13 @@ export interface operations {
                     "application/json": components["schemas"]["StaffAppointmentData"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2438,13 +2627,13 @@ export interface operations {
                     "application/json": components["schemas"]["StaffAppointmentData"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2469,13 +2658,13 @@ export interface operations {
                     "application/json": components["schemas"]["PublicBusinessResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2504,13 +2693,13 @@ export interface operations {
                     "application/json": components["schemas"]["AvailabilityResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2532,12 +2721,14 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Repetição idempotente */
+            /** @description Repetição idempotente (RN13) */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["BookingResponse"];
+                };
             };
             /** @description Successful Response */
             201: {
@@ -2548,13 +2739,13 @@ export interface operations {
                     "application/json": components["schemas"]["BookingResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2579,13 +2770,13 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerAppointmentResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2610,13 +2801,13 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerChangeResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };
@@ -2645,13 +2836,13 @@ export interface operations {
                     "application/json": components["schemas"]["CustomerChangeResponse"];
                 };
             };
-            /** @description Validation Error */
+            /** @description VALIDATION_ERROR, com os campos recusados em `errors` */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["ValidationProblem"];
                 };
             };
         };

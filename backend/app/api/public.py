@@ -83,7 +83,12 @@ async def get_availability(
 @router.post(
     "/{slug}/appointments",
     status_code=status.HTTP_201_CREATED,
-    responses={status.HTTP_200_OK: {"description": "Repetição idempotente"}},
+    responses={
+        status.HTTP_200_OK: {
+            "model": BookingResponse,
+            "description": "Repetição idempotente (RN13)",
+        }
+    },
     dependencies=[limited_by_ip(PUBLIC_BOOKING_BY_IP)],
 )
 async def create_booking(

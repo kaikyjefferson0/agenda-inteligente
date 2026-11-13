@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import exists, func, select, update
+from sqlalchemy import delete, exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import RefreshToken
@@ -46,6 +46,10 @@ async def revoke_family(session: AsyncSession, family_id: UUID, now: datetime) -
         .where(RefreshToken.family_id == family_id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=now)
     )
+
+
+async def delete_for_user(session: AsyncSession, user_id: UUID) -> None:
+    await session.execute(delete(RefreshToken).where(RefreshToken.user_id == user_id))
 
 
 async def revoke_all_for_user(

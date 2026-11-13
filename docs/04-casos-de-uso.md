@@ -26,11 +26,12 @@ As regras citadas estão em [Regras de negócio](03-regras-negocio.md), e os tes
 ### UC04. Adicionar e desativar profissionais
 
 - **Ator:** Dono. **Regras:** RN23, RN24, RN26, RN28, RN30.
-- **Fluxo de convite:** informa nome e e-mail; o sistema cria a conta pendente e o registro de profissional fora das reservas; o profissional recebe o link, define a senha, passa a poder entrar e entra nas novas reservas. Convidar de novo um e-mail pendente do mesmo negócio renova o link.
+- **Fluxo de convite:** informa nome e e-mail; o sistema cria a conta pendente e o registro de profissional fora das reservas; o profissional recebe o link, define a senha, passa a poder entrar e entra nas novas reservas. Convidar de novo um e-mail pendente do mesmo negócio renova o link. A lista da equipe mostra quando vence o link de cada convite pendente.
+- **Fluxo de cancelamento do convite:** enquanto o convite estiver pendente, o Dono o cancela; o sistema apaga a conta pendente e o registro de profissional, o link deixa de valer, e o e-mail pode ser convidado de novo.
 - **Fluxo do Dono:** passa a atender criando o próprio registro de profissional.
 - **Fluxo de desativação:** o sistema confere os agendamentos futuros e desativa.
-- **Exceções:** e-mail já em uso; há agendamentos futuros (`409`, com a lista); convite bloqueado na demo; limite de convites ou de e-mail (`429`, sem criar nada).
-- **Situação da implementação:** concluído. A Fase 3 entregou o fluxo de convite e a perda de acesso de conta desativada. A Fase 4 entregou o fluxo do Dono (`POST /professionals/me`), o fluxo de desativação (`POST /professionals/{id}/deactivate`, com a verificação de agendamentos futuros da RN23 e o CT18) e a listagem (`GET /professionals`).
+- **Exceções:** e-mail já em uso; há agendamentos futuros (`409`, com a lista); convite ou cancelamento bloqueado na demo; limite de convites ou de e-mail (`429`, sem criar nada); cancelar um convite já aceito ou de conta desativada (`409 INVITATION_NOT_PENDING`).
+- **Situação da implementação:** concluído. A Fase 3 entregou o fluxo de convite e a perda de acesso de conta desativada. A Fase 4 entregou o fluxo do Dono (`POST /professionals/me`), o fluxo de desativação (`POST /professionals/{id}/deactivate`, com a verificação de agendamentos futuros da RN23 e o CT18) e a listagem (`GET /professionals`). A etapa do contrato da API acrescentou a validade do convite na listagem (D95) e o cancelamento do convite pendente (`DELETE /professionals/{id}/invitation`, D96).
 
 ## Configuração
 
