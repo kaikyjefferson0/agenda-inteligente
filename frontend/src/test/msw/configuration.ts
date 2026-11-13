@@ -139,6 +139,7 @@ export const configHandlers = [
         is_bookable: false,
         is_active: true,
         invitation_pending: true,
+        invitation_expires_at: '2026-11-19T16:00:00Z',
         service_ids: [],
       })
     } else pending.name = body.name
@@ -162,6 +163,7 @@ export const configHandlers = [
       is_bookable: true,
       is_active: true,
       invitation_pending: false,
+      invitation_expires_at: null,
       service_ids: [],
     }
     configApi.members().push(created)

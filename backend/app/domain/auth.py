@@ -42,6 +42,18 @@ def refresh_token_expiry(family_started_at: datetime, now: datetime) -> datetime
     return min(now + REFRESH_IDLE_TTL, family_started_at + REFRESH_ABSOLUTE_TTL)
 
 
+def is_invitation_pending(
+    *, is_professional: bool, has_password: bool, is_active: bool
+) -> bool:
+    """D96: the invite can still be accepted, renewed or cancelled.
+
+    Only a professional's account, without a password and still active. A
+    deactivated account is never pending: deactivation is definitive (RN23),
+    and its links stopped working with it.
+    """
+    return is_professional and not has_password and is_active
+
+
 def is_account_token_usable(
     used_at: datetime | None, expires_at: datetime, now: datetime
 ) -> bool:

@@ -1,6 +1,7 @@
+from datetime import datetime
 from uuid import UUID
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 
 from app.schemas.common import RequestModel, ResponseModel
 
@@ -21,5 +22,17 @@ class ProfessionalData(ResponseModel):
     email: str
     is_bookable: bool
     is_active: bool
-    invitation_pending: bool
+    invitation_pending: bool = Field(
+        description=(
+            "O convite ainda pode ser aceito: conta de profissional ativa e sem "
+            "senha. Uma conta desativada nunca está pendente (D96)"
+        )
+    )
+    invitation_expires_at: datetime | None = Field(
+        description=(
+            "Quando vence o link do convite pendente, em UTC (RN24, 7 dias). No "
+            "passado, o convite venceu e pode ser renovado. Nulo sem convite "
+            "pendente (D95)"
+        )
+    )
     service_ids: list[UUID]

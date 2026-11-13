@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Business, User
@@ -48,3 +48,12 @@ async def get_with_business_for_auth(
         )
     ).first()
     return None if row is None else (row[0], row[1])
+
+
+async def delete_pending_account(
+    session: AsyncSession, business_id: UUID, user_id: UUID
+) -> None:
+    """Only for an account that never had a password (D96): see the invitations."""
+    await session.execute(
+        delete(User).where(User.business_id == business_id, User.id == user_id)
+    )

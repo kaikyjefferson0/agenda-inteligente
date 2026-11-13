@@ -32,7 +32,7 @@ Cada conta pertence a um único negócio.
 |---|---|---|---|
 | Alterar configurações do negócio | Sim | Não | Não |
 | Gerenciar serviços | Sim | Somente consulta | Consulta pública |
-| Convidar e desativar profissionais | Sim | Não | Não |
+| Convidar, cancelar convite pendente e desativar profissionais | Sim | Não | Não |
 | Definir serviços de cada profissional | Sim | Não | Não |
 | Definir expediente | Todos | O próprio | Não |
 | Registrar bloqueios | Todos | Os próprios | Não |

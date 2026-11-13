@@ -7,7 +7,7 @@ CHECK finished_requires_no_payload demands, because it may hold a raw token.
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, select, update
+from sqlalchemy import ColumnElement, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import EmailOutbox, EmailOutboxStatus
@@ -108,3 +108,24 @@ async def mark_failed(
         payload=None,
         last_error=error,
     )
+
+
+async def fail_pending_for_recipient(
+    session: AsyncSession, to_email: str, template: str, error: str
+) -> int:
+    """D96: messages still waiting whose link died before they went out.
+
+    A worker that already reserved one finds it changed and writes nothing,
+    because its result only applies to the reservation it made (D38).
+    """
+    result = await session.execute(
+        update(EmailOutbox)
+        .where(
+            EmailOutbox.status == EmailOutboxStatus.PENDING,
+            EmailOutbox.template == template,
+            func.lower(EmailOutbox.to_email) == to_email.lower(),
+        )
+        .values(status=EmailOutboxStatus.FAILED, payload=None, last_error=error)
+        .returning(EmailOutbox.id)
+    )
+    return len(result.all())

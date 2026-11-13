@@ -78,6 +78,10 @@ O merge é bloqueado abaixo de:
 | CT55 | Profissional cria, altera ou marca resultado na agenda de colega; recurso de outro negócio | `403` na agenda de colega; `404` no recurso de outro negócio (D27) | Integração |
 | CT56 | Cancelamento e remarcação pela equipe, dentro e acima da cota de e-mail | E-mail enfileirado ao cliente sem o nome dele e sem o link; acima da cota, `email_status = "skipped"` (D31) | Integração |
 | CT68 | `409 SLOT_UNAVAILABLE` na criação manual e na remarcação pela equipe, com cada motivo e com mais de um ao mesmo tempo; o mesmo `409` na reserva pública e na remarcação pelo link | Nas rotas da equipe, `reason` e o `detail` do motivo, na ordem `changed_meanwhile`, `in_past`, `outside_working_hours`, `blocked`, `appointment_conflict`, com o original intacto na remarcação, e `changed_meanwhile` quando outra alteração mudou o profissional durante a espera dos locks; nas públicas, sem `reason` e com o `detail` genérico (D77) | Unidade e integração |
+| CT69 | `invitation_expires_at` em `GET /professionals`: convite pendente, renovado, vencido, aceito, registro do Dono e conta desativada antes do aceite | A data do último link, que muda na renovação e fica no passado depois do vencimento, sem o token; nulo para quem aceitou, para o Dono e para a conta desativada, que também tem `invitation_pending = false` (D95, D96) | Unidade e integração |
+| CT70 | Dono cancela um convite pendente, inclusive vencido e já configurado com serviços, expediente e bloqueios | `204`; conta, profissional, serviços do profissional, expediente, bloqueios e tokens apagados; o link antigo responde `400 INVALID_TOKEN`; o convite na fila vira `failed` com `"invitation_cancelled"`, sem tocar outros e-mails; o mesmo e-mail pode ser convidado de novo, neste ou em outro negócio, e o novo link é aceito (D96) | Integração |
+| CT71 | Cancelamento recusado: Profissional, negócio demo, convite aceito, conta desativada (inclusive antes do aceite), registro do Dono, outro negócio e id inexistente; cancelamento e aceite simultâneos | `403 FORBIDDEN`; `403 DEMO_RESTRICTED`, mesmo com id inexistente; `409 INVITATION_NOT_PENDING`, e o aceite da conta desativada responde `400`; `404`; nada é apagado; na corrida, só um dos dois vence (D96, RN28) | Integração |
+| CT72 | Contrato do OpenAPI e corpos reais | Todo `422` é `ValidationProblem`, sem o `HTTPValidationError` do framework; o `409` do bloqueio é a união por `code`, o da desativação é `AppointmentConflictsProblem`, e o `200` do `/me` e da repetição idempotente têm o corpo do `201`; os corpos reais conferem campo a campo com os schemas, em `application/problem+json` (D94) | Unidade e integração |
 
 ### Segurança
 
@@ -138,12 +142,12 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC01 | CT26, CT45 |
 | UC02 | CT28, CT37, CT38, CT41, CT42, CT43, E2E02 |
 | UC03 | CT21, CT32, CT39, CT40, CT45 |
-| UC04 | CT18, CT21, CT32, CT44, CT45, CT46 |
+| UC04 | CT18, CT21, CT32, CT44, CT45, CT46, CT69, CT70, CT71 |
 | UC05 | CT19, CT20, CT25, CT32 |
 | UC06 | CT10, CT32 |
 | UC07 | CT08 |
 | UC08 | CT25 |
-| UC09 | CT17, CT31 |
+| UC09 | CT17, CT31, CT72 |
 | UC10 | CT01, CT02, CT03, CT04, CT05 |
 | UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, CT36, CT57, CT68, E2E01 |
 | UC12 | CT11, CT36, CT49, CT50, E2E01 |
@@ -153,4 +157,4 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC16 | CT15, CT16, CT35, CT52, CT54, CT55, CT57, CT68 |
 | UC17 | CT33, CT34, CT35, CT53, CT55, CT56, CT57, CT68 |
 | UC18 | CT34, CT55 |
-| Transversal | CT19, CT20, CT29, CT58, CT59, CT60, CT61, CT62, CT63, CT64, CT65, CT66, CT67 |
+| Transversal | CT19, CT20, CT29, CT58, CT59, CT60, CT61, CT62, CT63, CT64, CT65, CT66, CT67, CT72 |

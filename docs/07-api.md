@@ -11,8 +11,9 @@ Este documento define o contrato inicial. Depois da implementação, o OpenAPI g
 - **Cookies:** as rotas `/auth/refresh` e `/auth/logout` exigem o cabeçalho `X-Requested-With`, com qualquer valor não vazio, como proteção contra CSRF. Sem ele, respondem `403 FORBIDDEN`, sem tocar no token.
 - **Erros:** seguem a RFC 9457 (`application/problem+json`), com um `code` estável.
 - **Link do cliente:** o token nunca aparece nos logs, e a página usa `Referrer-Policy: no-referrer`.
+- **Erros no OpenAPI (D94):** o OpenAPI declara só as respostas com corpo próprio: o `422` de toda rota com entrada (`ValidationProblem`, com os campos em `errors`), os `409` com `conflicts` ou `reason` e as respostas de sucesso alternativas, como o `200` de uma repetição. Os demais erros (`400`, `401`, `403`, `404`, os `409` sem campos próprios, `429` e `500`) não são declarados rota a rota: todos seguem o problema genérico abaixo, com o `code` da [tabela de códigos](#códigos-de-erro). O `429` traz `Retry-After`. O OpenAPI lista esses corpos como `application/json`, mas a resposta real sai como `application/problem+json`, conferida em teste.
 
-Exemplo de erro:
+Exemplo de erro (o problema genérico, schema `Problem`):
 
 ```json
 {
@@ -21,6 +22,19 @@ Exemplo de erro:
   "status": 409,
   "code": "SLOT_UNAVAILABLE",
   "detail": "Este horário acabou de ser reservado."
+}
+```
+
+O `422` acrescenta `errors`, com um item por campo recusado. `loc` começa pelo lugar (`body`, `query`, `path` ou `header`), e `msg` fica em inglês: o frontend mostra o próprio texto de cada campo.
+
+```json
+{
+  "type": "https://api.exemplo.com/problems/validation-error",
+  "title": "Dados inválidos",
+  "status": 422,
+  "code": "VALIDATION_ERROR",
+  "detail": "Confira os dados enviados.",
+  "errors": [{ "loc": ["body", "reason"], "msg": "String should have at least 1 character", "type": "string_too_short" }]
 }
 ```
 
@@ -56,6 +70,7 @@ Exemplo de erro:
 | `POST /professionals/invitations` | Convida profissional | Dono | `202` | UC04 |
 | `POST /professionals/me` | Dono passa a atender | Dono | `201`, ou `200` se o registro já existir | UC04 |
 | `POST /professionals/{id}/deactivate` | Desativa profissional | Dono | `204` | UC04 |
+| `DELETE /professionals/{id}/invitation` | Cancela convite pendente | Dono | `204` | UC04 |
 | `PUT /professionals/{id}/services` | Define serviços atendidos | Dono | `200` | UC07 |
 | `GET /professionals/{id}/working-hours` | Lê expediente | Dono ou o próprio | `200` | UC08 |
 | `PUT /professionals/{id}/working-hours` | Substitui expediente | Dono ou o próprio | `200` | UC08 |
@@ -86,11 +101,30 @@ Exemplo de erro:
 
 ### Equipe
 
-- `GET /professionals` e `PUT /professionals/{id}/services` devolvem `id`, `user_id`, `name`, `email`, `is_bookable`, `is_active`, `invitation_pending` e `service_ids`. É assim que se leem os serviços de um profissional.
-- `POST /professionals/me` cria o registro do Dono. Se ele já existir, responde `200` e o deixa com `is_bookable = true`, o que também traz de volta o Dono que deixou de atender.
+- `GET /professionals`, `PUT /professionals/{id}/services` e `POST /professionals/me` devolvem `id`, `user_id`, `name`, `email`, `is_bookable`, `is_active`, `invitation_pending`, `invitation_expires_at` e `service_ids`. É assim que se leem os serviços de um profissional.
+- `invitation_pending` é `true` só enquanto o convite ainda pode ser aceito: conta de profissional, ativa e sem senha. Uma conta desativada antes do aceite nunca está pendente (D96).
+- `invitation_expires_at` é o instante, em UTC, em que vence o link do convite pendente (RN24, 7 dias depois do último envio), e só vem preenchido quando `invitation_pending` é `true`. No passado, o convite venceu, continua pendente e pode ser renovado convidando de novo. É nulo para o Dono, para quem aceitou e para quem foi desativado. A resposta nunca traz o token (D95).
+- `POST /professionals/me` cria o registro do Dono. Se ele já existir, responde `200`, com o mesmo corpo do `201`, e o deixa com `is_bookable = true`, o que também traz de volta o Dono que deixou de atender.
 - `PUT /professionals/{id}/services` recebe `{"service_ids": [...]}`. Serviço inexistente ou de outro negócio responde `404`, sem alterar nada. Serviço inativo é aceito, porque a RN07 se aplica na reserva, e IDs repetidos contam uma vez.
-- `POST /professionals/{id}/deactivate` responde `409 APPOINTMENT_CONFLICTS` enquanto houver agendamentos confirmados com início no futuro (RN23). Atendimento em andamento não impede. Repetir a chamada responde `204`.
+- `POST /professionals/{id}/deactivate` responde `409 APPOINTMENT_CONFLICTS`, com a lista em `conflicts` (schema `AppointmentConflictsProblem`), enquanto houver agendamentos confirmados com início no futuro (RN23). Atendimento em andamento não impede. Repetir a chamada responde `204`.
 - Na V1, a desativação de um profissional é definitiva: não há rota para reativar, e o e-mail continua em uso (RN24). Os links pendentes da conta deixam de funcionar. O Dono mantém o login e volta a atender com `POST /professionals/me`.
+
+#### Cancelar convite pendente (D96)
+
+`DELETE /professionals/{id}/invitation` não tem corpo e responde `204`. Numa única transação, apaga a conta pendente e o registro de profissional, com os serviços, o expediente e os bloqueios que o Dono já tiver configurado, e os tokens da conta. O e-mail fica livre para um novo convite, neste ou em outro negócio, que cria outra conta e outro `professional_id`.
+
+- **Link antigo:** o token sai junto com a conta, então o aceite responde `400 INVALID_TOKEN`, como qualquer link inválido.
+- **E-mail na fila:** o convite ainda `pending` na fila para esse endereço vira `failed`, com `last_error = "invitation_cancelled"` e `payload` nulo, e nunca sai. Um worker que já o tinha reservado não grava o envio (D38).
+- **Convite vencido:** continua pendente e pode ser cancelado.
+- **Concorrência:** a conta é travada antes do profissional, como no aceite e na desativação. Entre um cancelamento e um aceite simultâneos, só um vence: ou o cancelamento responde `204` e o aceite `400`, ou o aceite responde `204` e o cancelamento `409`.
+- As cotas de convite e de e-mail já gastas não são devolvidas.
+
+Recusas, em ordem:
+
+- **Papel:** Profissional, `403 FORBIDDEN`.
+- **Demo (RN28):** `403 DEMO_RESTRICTED`, conferido antes de procurar o profissional, como no convite.
+- **Profissional:** inexistente ou de outro negócio, `404`.
+- **Situação:** convite já aceito, conta desativada (inclusive antes do aceite) ou registro do Dono, `409 INVITATION_NOT_PENDING`. Um profissional que já entrou sai da equipe pela desativação.
 
 ### Expediente e bloqueios
 
@@ -108,7 +142,7 @@ Exemplo de erro:
 - A resposta do `PUT` inclui `appointments_outside_hours`, com os agendamentos futuros confirmados do profissional cujo bloco, com o preparo, não cabe em um único intervalo (RN03, RN22).
 - Intervalos encostados, como 09:00–12:00 e 12:00–18:00, são aceitos e guardados como enviados. Por isso, um atendimento não pode atravessar as 12:00. Intervalos sobrepostos ou com fim antes do início respondem `422`.
 - `POST /professionals/{id}/time-blocks` recebe `starts_at`, `ends_at`, ambos com fuso, e `reason`, de 1 a 500 caracteres. A resposta traz `id`, `professional_id`, `starts_at`, `ends_at` e `reason`. Bloqueio no passado é aceito.
-- O bloqueio responde `409 APPOINTMENT_CONFLICTS` se sobrepuser o período `[starts_at, blocked_until)` de um agendamento não cancelado (RN04, RN21). Se também sobrepuser outro bloqueio, esse código tem prioridade.
+- O bloqueio responde `409 APPOINTMENT_CONFLICTS`, com a lista em `conflicts`, se sobrepuser o período `[starts_at, blocked_until)` de um agendamento não cancelado (RN04, RN21). Se também sobrepuser outro bloqueio, esse código tem prioridade. Sobre outro bloqueio, sem agendamento, responde `409 TIME_BLOCK_OVERLAP`, sem lista. No OpenAPI, o `409` é a união de `AppointmentConflictsProblem` e `TimeBlockOverlapProblem`, separada por `code` (D94).
 - `GET /professionals/{id}/time-blocks`, `GET /professionals` e `GET /services` devolvem listas simples e ordenadas, sem paginação nem filtros.
 
 ### Agendamentos nas respostas
@@ -463,7 +497,7 @@ Todas as respostas dessas rotas, inclusive as de erro, levam `Cache-Control: no-
 
 | Rota | Função | Sucesso |
 |---|---|---|
-| `GET /health` | Verifica a API e a conexão com o banco | `200` |
+| `GET /health` | Verifica a API e a conexão com o banco | `200`, com `{"status": "ok", "database": "ok"}` |
 
 ## Códigos de erro
 
@@ -482,12 +516,13 @@ Todas as respostas dessas rotas, inclusive as de erro, levam `Cache-Control: no-
 | `409` | `INVALID_STATUS_TRANSITION` | Agendamento em status final ou resultado antes do início |
 | `409` | `APPOINTMENT_CONFLICTS` | Bloqueio ou desativação com conflitos; inclui `conflicts` |
 | `409` | `TIME_BLOCK_OVERLAP` | Bloqueio sobre outro bloqueio |
+| `409` | `INVITATION_NOT_PENDING` | Cancelar convite já aceito, de conta desativada ou do registro do Dono (D96) |
 | `409` | `EMAIL_IN_USE`, `SLUG_IN_USE` | Valor já usado |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | Mesma chave com dados diferentes |
 | `422` | `VALIDATION_ERROR` | Dados inválidos, ou profissional que não atende o serviço |
 | `429` | `RATE_LIMITED` | Limite excedido; inclui `Retry-After` |
 | `4xx` | `HTTP_ERROR` | Erro do protocolo sem código próprio, como método não permitido |
 | `500` | `INTERNAL_ERROR` | Erro inesperado, sem detalhes na resposta |
-| `503` | `DATABASE_UNAVAILABLE` | `GET /health` não conseguiu acessar o banco |
+| `503` | `DATABASE_UNAVAILABLE` | `GET /health` não conseguiu acessar o banco; declarado no OpenAPI como `Problem` |
 
 No negócio demo, `POST /auth/password/forgot` continua respondendo `202`, mas não enfileira e-mail.

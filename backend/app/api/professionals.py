@@ -1,6 +1,8 @@
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Response, status
+from pydantic import Field
 
 from app.api.deps import (
     CurrentSessionDep,
@@ -10,6 +12,7 @@ from app.api.deps import (
     SettingsDep,
 )
 from app.schemas.auth import InvitationResponse, InviteProfessionalRequest
+from app.schemas.problems import AppointmentConflictsProblem, TimeBlockOverlapProblem
 from app.schemas.professionals import (
     ProfessionalData,
     SetProfessionalServicesRequest,
@@ -26,6 +29,17 @@ from app.schemas.schedule import (
 from app.services import invitations, schedule, team
 
 router = APIRouter(prefix="/professionals", tags=["professionals"])
+
+# D94: the 409 of a block is told apart by `code`.
+TimeBlockConflict = Annotated[
+    AppointmentConflictsProblem | TimeBlockOverlapProblem,
+    Field(discriminator="code"),
+]
+
+
+def _conflict(model: Any, description: str) -> dict[int | str, dict[str, Any]]:
+    """D94: listed as `application/json`; it goes out as `problem+json`."""
+    return {status.HTTP_409_CONFLICT: {"model": model, "description": description}}
 
 
 @router.get("")
@@ -62,7 +76,12 @@ async def invite_professional(
 @router.post(
     "/me",
     status_code=status.HTTP_201_CREATED,
-    responses={status.HTTP_200_OK: {"description": "O registro já existia"}},
+    responses={
+        status.HTTP_200_OK: {
+            "model": ProfessionalData,
+            "description": "O registro já existia e voltou a atender",
+        }
+    },
 )
 async def start_serving(
     response: Response, current: OwnerSessionDep, session: SessionDep
@@ -73,7 +92,24 @@ async def start_serving(
     return ProfessionalData.model_validate(profile)
 
 
-@router.post("/{professional_id}/deactivate", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{professional_id}/invitation", status_code=status.HTTP_204_NO_CONTENT)
+async def cancel_invitation(
+    professional_id: UUID, current: OwnerSessionDep, session: SessionDep
+) -> None:
+    """D96: only a pending invite; the e-mail is free for a new one."""
+    await invitations.cancel_invitation(
+        session, business=current.business, professional_id=professional_id
+    )
+
+
+@router.post(
+    "/{professional_id}/deactivate",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=_conflict(
+        AppointmentConflictsProblem,
+        "APPOINTMENT_CONFLICTS: há agendamentos futuros confirmados (RN23)",
+    ),
+)
 async def deactivate_professional(
     professional_id: UUID,
     current: OwnerSessionDep,
@@ -151,7 +187,15 @@ async def list_time_blocks(
     return [TimeBlockData.model_validate(block) for block in blocks]
 
 
-@router.post("/{professional_id}/time-blocks", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{professional_id}/time-blocks",
+    status_code=status.HTTP_201_CREATED,
+    responses=_conflict(
+        TimeBlockConflict,
+        "APPOINTMENT_CONFLICTS, com a lista (RN21), que tem prioridade, ou "
+        "TIME_BLOCK_OVERLAP",
+    ),
+)
 async def create_time_block(
     professional_id: UUID,
     body: CreateTimeBlockRequest,

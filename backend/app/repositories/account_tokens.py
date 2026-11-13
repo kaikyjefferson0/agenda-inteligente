@@ -1,7 +1,8 @@
+from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AccountToken, AccountTokenPurpose
@@ -50,3 +51,29 @@ async def invalidate_unused(
         )
         .values(used_at=now)
     )
+
+
+async def latest_unused_expiry(
+    session: AsyncSession, user_ids: Sequence[UUID], purpose: AccountTokenPurpose
+) -> dict[UUID, datetime]:
+    """When the link still outstanding for each user expires, if there is one.
+
+    A renewal marks the previous links as used, so only one is left unused; an
+    expired one is still returned, with its date in the past.
+    """
+    if not user_ids:
+        return {}
+    rows = await session.execute(
+        select(AccountToken.user_id, func.max(AccountToken.expires_at))
+        .where(
+            AccountToken.user_id.in_(user_ids),
+            AccountToken.purpose == purpose,
+            AccountToken.used_at.is_(None),
+        )
+        .group_by(AccountToken.user_id)
+    )
+    return {user_id: expires_at for user_id, expires_at in rows}
+
+
+async def delete_for_user(session: AsyncSession, user_id: UUID) -> None:
+    await session.execute(delete(AccountToken).where(AccountToken.user_id == user_id))

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.auth import is_invitation_pending
 from app.domain.errors import AppError, ErrorCode
 from app.models import AccountTokenPurpose, Professional, User, UserRole
 from app.repositories import (
@@ -26,6 +27,7 @@ class ProfessionalProfile:
     is_bookable: bool
     is_active: bool
     invitation_pending: bool
+    invitation_expires_at: datetime | None
     service_ids: list[UUID]
 
 
@@ -36,6 +38,19 @@ async def _load_profiles(
         session, business_id, professional_id=professional_id
     )
     service_ids = await professionals.list_service_ids(session, business_id)
+    pending = {
+        user.id
+        for _, user in rows
+        if is_invitation_pending(
+            is_professional=user.role is UserRole.PROFESSIONAL,
+            has_password=user.password_hash is not None,
+            is_active=user.is_active,
+        )
+    }
+    # D95: only the date, never the token. The users come from this business.
+    expiries = await account_tokens.latest_unused_expiry(
+        session, list(pending), AccountTokenPurpose.INVITE
+    )
     return [
         ProfessionalProfile(
             id=professional.id,
@@ -44,7 +59,8 @@ async def _load_profiles(
             email=user.email,
             is_bookable=professional.is_bookable,
             is_active=user.is_active,
-            invitation_pending=user.password_hash is None,
+            invitation_pending=user.id in pending,
+            invitation_expires_at=expiries.get(user.id),
             service_ids=service_ids.get(professional.id, []),
         )
         for professional, user in rows

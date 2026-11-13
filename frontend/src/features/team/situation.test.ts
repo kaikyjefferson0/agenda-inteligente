@@ -15,6 +15,7 @@ function member(overrides: Partial<Professional>): Professional {
     is_bookable: true,
     is_active: true,
     invitation_pending: false,
+    invitation_expires_at: null,
     service_ids: [],
     ...overrides,
   }

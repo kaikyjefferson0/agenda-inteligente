@@ -1,4 +1,3 @@
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.appointments import router as appointments_router
@@ -9,6 +8,7 @@ from app.api.customer_link import CustomerLinkHeadersMiddleware
 from app.api.customer_link import router as customer_link_router
 from app.api.errors import register_error_handlers
 from app.api.health import router as health_router
+from app.api.openapi import AgendaApi
 from app.api.professionals import router as professionals_router
 from app.api.public import router as public_router
 from app.api.time_blocks import router as time_blocks_router
@@ -20,7 +20,7 @@ API_PREFIX = "/api/v1"
 # D24: before the first request, both under uvicorn and in the tests.
 install_customer_token_filter()
 
-app = FastAPI(title="Agenda Inteligente API", version="0.1.0")
+app = AgendaApi(title="Agenda Inteligente API", version="0.1.0")
 app.add_middleware(
     CustomerLinkHeadersMiddleware,
     path_prefix=f"{API_PREFIX}{customer_link_router.prefix}",

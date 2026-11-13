@@ -23,6 +23,7 @@ from app.repositories import (
     catalog,
     professionals,
     time_blocks,
+    users,
     working_hours,
 )
 from tests.auth.helpers import API, Clock, bearer, get_user
@@ -240,6 +241,30 @@ async def test_replacing_working_hours_needs_the_business(
     assert await working_hours.list_for_professional(
         db, scene.business_id, scene.professional_id
     )
+
+
+async def test_deleting_a_professional_needs_its_business(
+    db: AsyncSession, scene: Scene
+) -> None:
+    await professionals.delete_with_schedule(
+        db, scene.other_business_id, scene.professional_id
+    )
+
+    assert await professionals.get(db, scene.business_id, scene.professional_id)
+    linked = await professionals.list_service_ids(db, scene.business_id)
+    assert linked[scene.professional_id] == [scene.service_id]
+    assert await working_hours.list_for_professional(
+        db, scene.business_id, scene.professional_id
+    )
+    assert await time_blocks.get(db, scene.business_id, scene.time_block_id)
+
+
+async def test_deleting_an_account_needs_its_business(
+    db: AsyncSession, scene: Scene
+) -> None:
+    await users.delete_pending_account(db, scene.other_business_id, scene.user_id)
+
+    assert await users.lock_by_id_for_auth(db, scene.user_id)
 
 
 async def try_to_lock(engine: AsyncEngine, professional_id: UUID) -> None:
