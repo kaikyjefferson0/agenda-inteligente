@@ -4,11 +4,12 @@ Este documento define o contrato inicial. Depois da implementação, o OpenAPI g
 
 ## Convenções
 
-- **Prefixo:** `/api/v1`, exceto `GET /health`.
+- **Prefixo:** `/api/v1`, exceto `GET /health` e `GET /ready`.
 - **Negócio:** nas rotas autenticadas, vem da sessão, nunca da URL.
 - **Datas:** ISO 8601 com fuso. Datas sem hora, como em `availability`, são dias locais do negócio.
 - **Autenticação:** `Authorization: Bearer <token>`. O refresh fica em um cookie HttpOnly.
-- **Cookies:** as rotas `/auth/refresh` e `/auth/logout` exigem o cabeçalho `X-Requested-With`, com qualquer valor não vazio, como proteção contra CSRF. Sem ele, respondem `403 FORBIDDEN`, sem tocar no token.
+- **Cookies:** o refresh fica no cookie `__Host-refresh_token`, com `Path=/` (D108). As rotas `/auth/refresh` e `/auth/logout` têm duas proteções contra CSRF, conferidas antes de tocar no token: o cabeçalho `Origin` precisa ser uma das origens de `CORS_ALLOWED_ORIGINS`, e sem ele ou com outra origem respondem `403 ORIGIN_NOT_ALLOWED` (D110); e o cabeçalho `X-Requested-With`, com qualquer valor não vazio, é obrigatório, e sem ele respondem `403 FORBIDDEN`.
+- **Cabeçalhos de segurança (D117):** toda resposta leva `Strict-Transport-Security`, `X-Content-Type-Options: nosniff` e `X-Frame-Options: DENY`, sem `Content-Security-Policy`, que quebraria o Swagger UI. A exceção é o `500 INTERNAL_ERROR` genérico, montado pelo Starlette fora dos middlewares.
 - **Erros:** seguem a RFC 9457 (`application/problem+json`), com um `code` estável.
 - **Link do cliente:** o token nunca aparece nos logs, e a página usa `Referrer-Policy: no-referrer`.
 - **Erros no OpenAPI (D94):** o OpenAPI declara só as respostas com corpo próprio: o `422` de toda rota com entrada (`ValidationProblem`, com os campos em `errors`), os `409` com `conflicts` ou `reason` e as respostas de sucesso alternativas, como o `200` de uma repetição. Os demais erros (`400`, `401`, `403`, `404`, os `409` sem campos próprios, `429` e `500`) não são declarados rota a rota: todos seguem o problema genérico abaixo, com o `code` da [tabela de códigos](#códigos-de-erro). O `429` traz `Retry-After`. O OpenAPI lista esses corpos como `application/json`, mas a resposta real sai como `application/problem+json`, conferida em teste.
@@ -497,7 +498,8 @@ Todas as respostas dessas rotas, inclusive as de erro, levam `Cache-Control: no-
 
 | Rota | Função | Sucesso |
 |---|---|---|
-| `GET /health` | Verifica a API e a conexão com o banco | `200`, com `{"status": "ok", "database": "ok"}` |
+| `GET /health` | Verifica só o processo, sem consultar o banco. É a rota do health check do Render, chamada a cada poucos segundos, e não acorda o banco (D118) | `200`, com `{"status": "ok"}` |
+| `GET /ready` | Verifica a API e a conexão com o banco (`SELECT 1`, com 3 s de limite). Serve para o teste de fumaça manual depois de um deploy; o Render não a chama | `200`, com `{"status": "ok", "database": "ok"}`; sem o banco, `503 DATABASE_UNAVAILABLE` |
 
 ## Códigos de erro
 
@@ -508,6 +510,7 @@ Todas as respostas dessas rotas, inclusive as de erro, levam `Cache-Control: no-
 | `401` | `NOT_AUTHENTICATED` | Token de acesso ausente, inválido, expirado ou de sessão revogada |
 | `401` | `INVALID_REFRESH_TOKEN` | Refresh inválido, expirado ou reutilizado |
 | `403` | `FORBIDDEN` | Papel ou agenda sem permissão, ou `X-Requested-With` ausente |
+| `403` | `ORIGIN_NOT_ALLOWED` | `/auth/refresh` ou `/auth/logout` sem `Origin` ou com uma origem fora de `CORS_ALLOWED_ORIGINS` (D110) |
 | `403` | `REGISTRATION_DISABLED` | Cadastro desligado |
 | `403` | `DEMO_RESTRICTED` | Operação travada no negócio demo |
 | `404` | `NOT_FOUND` | Inexistente, de outro negócio ou token inválido |
@@ -523,6 +526,6 @@ Todas as respostas dessas rotas, inclusive as de erro, levam `Cache-Control: no-
 | `429` | `RATE_LIMITED` | Limite excedido; inclui `Retry-After` |
 | `4xx` | `HTTP_ERROR` | Erro do protocolo sem código próprio, como método não permitido |
 | `500` | `INTERNAL_ERROR` | Erro inesperado, sem detalhes na resposta |
-| `503` | `DATABASE_UNAVAILABLE` | `GET /health` não conseguiu acessar o banco; declarado no OpenAPI como `Problem` |
+| `503` | `DATABASE_UNAVAILABLE` | `GET /ready` não conseguiu acessar o banco; declarado no OpenAPI como `Problem` |
 
 No negócio demo, `POST /auth/password/forgot` continua respondendo `202`, mas não enfileira e-mail.

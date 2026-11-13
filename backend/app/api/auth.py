@@ -10,6 +10,7 @@ from app.api.deps import (
     NowDep,
     SessionDep,
     SettingsDep,
+    require_allowed_origin,
     require_csrf_header,
 )
 from app.api.errors import app_error_response
@@ -29,8 +30,10 @@ from app.services.auth import IssuedSession
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-REFRESH_COOKIE_NAME = "refresh_token"
-REFRESH_COOKIE_PATH = "/api/v1/auth"
+# D108: the __Host- prefix makes the browser refuse a cookie planted by a
+# sibling subdomain; it requires Secure, no Domain and Path=/.
+REFRESH_COOKIE_NAME = "__Host-refresh_token"
+REFRESH_COOKIE_PATH = "/"
 
 RefreshCookie = Annotated[str | None, Cookie(alias=REFRESH_COOKIE_NAME)]
 
@@ -120,7 +123,7 @@ async def login(
 
 @router.post(
     "/refresh",
-    dependencies=[Depends(require_csrf_header)],
+    dependencies=[Depends(require_allowed_origin), Depends(require_csrf_header)],
     response_model=SessionResponse,
 )
 async def refresh(
@@ -144,7 +147,7 @@ async def refresh(
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_csrf_header)],
+    dependencies=[Depends(require_allowed_origin), Depends(require_csrf_header)],
 )
 async def logout(
     response: Response,

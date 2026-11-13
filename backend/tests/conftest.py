@@ -24,7 +24,7 @@ from app.core import security
 from app.core.config import Settings, get_settings
 from app.core.database import get_session
 from app.main import app
-from tests.auth.helpers import Clock
+from tests.auth.helpers import ORIGIN, Clock
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 TRUNCATE_ALL = text(
@@ -119,6 +119,8 @@ def settings() -> Settings:
         update={
             "registration_enabled": True,
             "frontend_base_url": "https://app.test",
+            # D110: the cookie routes check Origin against this list.
+            "cors_allowed_origins": ORIGIN,
             "trusted_client_ip_header": "",
             "email_daily_cap": 100,
             "email_recipient_daily_cap": 3,

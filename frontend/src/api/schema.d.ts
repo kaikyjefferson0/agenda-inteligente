@@ -11,8 +11,32 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health */
+        /**
+         * Health
+         * @description D118: only the process. The host calls it every few seconds, and a query
+         *     on each call would keep the database from ever suspending.
+         */
         get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description The process and the database, for the manual smoke test after a deploy.
+         */
+        get: operations["ready_ready_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -983,7 +1007,7 @@ export interface components {
          * ErrorCode
          * @enum {string}
          */
-        ErrorCode: "INVALID_TOKEN" | "INVALID_CREDENTIALS" | "NOT_AUTHENTICATED" | "INVALID_REFRESH_TOKEN" | "FORBIDDEN" | "REGISTRATION_DISABLED" | "DEMO_RESTRICTED" | "NOT_FOUND" | "SLOT_UNAVAILABLE" | "CHANGE_DEADLINE_PASSED" | "INVALID_STATUS_TRANSITION" | "IDEMPOTENCY_KEY_REUSED" | "APPOINTMENT_CONFLICTS" | "TIME_BLOCK_OVERLAP" | "INVITATION_NOT_PENDING" | "EMAIL_IN_USE" | "SLUG_IN_USE" | "VALIDATION_ERROR" | "RATE_LIMITED" | "DATABASE_UNAVAILABLE" | "HTTP_ERROR" | "INTERNAL_ERROR";
+        ErrorCode: "INVALID_TOKEN" | "INVALID_CREDENTIALS" | "NOT_AUTHENTICATED" | "INVALID_REFRESH_TOKEN" | "FORBIDDEN" | "ORIGIN_NOT_ALLOWED" | "REGISTRATION_DISABLED" | "DEMO_RESTRICTED" | "NOT_FOUND" | "SLOT_UNAVAILABLE" | "CHANGE_DEADLINE_PASSED" | "INVALID_STATUS_TRANSITION" | "IDEMPOTENCY_KEY_REUSED" | "APPOINTMENT_CONFLICTS" | "TIME_BLOCK_OVERLAP" | "INVITATION_NOT_PENDING" | "EMAIL_IN_USE" | "SLUG_IN_USE" | "VALIDATION_ERROR" | "RATE_LIMITED" | "DATABASE_UNAVAILABLE" | "HTTP_ERROR" | "INTERNAL_ERROR";
         /** FieldErrorData */
         FieldErrorData: {
             /**
@@ -1014,11 +1038,6 @@ export interface components {
              * @constant
              */
             status: "ok";
-            /**
-             * Database
-             * @constant
-             */
-            database: "ok";
         };
         /** IntervalData */
         IntervalData: {
@@ -1212,6 +1231,19 @@ export interface components {
             price_cents: number;
             /** Professional Ids */
             professional_ids: string[];
+        };
+        /** ReadyResponse */
+        ReadyResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "ok";
+            /**
+             * Database
+             * @constant
+             */
+            database: "ok";
         };
         /** RegisterRequest */
         RegisterRequest: {
@@ -1675,6 +1707,26 @@ export interface operations {
                     "application/json": components["schemas"]["HealthResponse"];
                 };
             };
+        };
+    };
+    ready_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadyResponse"];
+                };
+            };
             /** @description DATABASE_UNAVAILABLE */
             503: {
                 headers: {
@@ -1756,11 +1808,12 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                origin?: string | null;
                 "x-requested-with"?: string | null;
             };
             path?: never;
             cookie?: {
-                refresh_token?: string | null;
+                "__Host-refresh_token"?: string | null;
             };
         };
         requestBody?: never;
@@ -1789,11 +1842,12 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
+                origin?: string | null;
                 "x-requested-with"?: string | null;
             };
             path?: never;
             cookie?: {
-                refresh_token?: string | null;
+                "__Host-refresh_token"?: string | null;
             };
         };
         requestBody?: never;

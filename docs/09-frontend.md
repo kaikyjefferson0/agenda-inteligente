@@ -78,7 +78,7 @@ O CI confere os dois arquivos: `export_openapi --check` no job do backend e `api
 
 Os caminhos do OpenAPI já começam com `/api/v1`, então a base do cliente é só a origem: `import.meta.env.VITE_API_BASE_URL ?? ''`.
 
-- **Desenvolvimento:** a base é vazia. O Vite repassa `/api` para `VITE_API_PROXY_TARGET` (padrão `http://api:8000`, dentro do Docker; fora dele, `http://localhost:8002`), e frontend e API ficam na mesma origem. O cookie de refresh, com `SameSite=Strict` e `Path=/api/v1/auth`, funciona sem CORS.
+- **Desenvolvimento:** a base é vazia. O Vite repassa `/api` para `VITE_API_PROXY_TARGET` (padrão `http://api:8000`, dentro do Docker; fora dele, `http://localhost:8002`), e frontend e API ficam na mesma origem. O cookie de refresh (`__Host-refresh_token`, com `SameSite=Strict` e `Path=/`) funciona sem CORS. Mesmo na mesma origem, o navegador envia `Origin` no `POST`, e a API o confere em `/auth/refresh` e `/auth/logout` (D110), então a origem do Vite precisa estar em `CORS_ALLOWED_ORIGINS`, como no `.env.example`.
 - **Produção:** `VITE_API_BASE_URL` é a origem da API, como `https://api.exemplo.com`, definida no build. Frontend e API ficam em subdomínios do mesmo domínio ([Arquitetura](08-arquitetura.md#deploy)), e o cliente envia `credentials: 'include'` para o cookie acompanhar as chamadas de autenticação. A origem do frontend precisa estar em `CORS_ALLOWED_ORIGINS`.
 
 ### Erros e repetições

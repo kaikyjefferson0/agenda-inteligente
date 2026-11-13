@@ -16,7 +16,11 @@ API = "/api/v1"
 PASSWORD = "senha-correta-123"
 OTHER_PASSWORD = "outra-senha-forte-456"
 OWNER_EMAIL = "dono@example.com"
-CSRF_HEADER = {"X-Requested-With": "XMLHttpRequest"}
+# The origin the settings fixture allows (CORS_ALLOWED_ORIGINS, D110).
+ORIGIN = "https://app.test"
+REFRESH_COOKIE = "__Host-refresh_token"
+# What a browser sends to the cookie routes: the custom header and the Origin.
+CSRF_HEADER = {"X-Requested-With": "XMLHttpRequest", "Origin": ORIGIN}
 
 
 @dataclass
@@ -47,7 +51,7 @@ def refresh_cookie(response: Response) -> SimpleCookie:
 
 
 def raw_refresh_token(response: Response) -> str:
-    return refresh_cookie(response)["refresh_token"].value
+    return refresh_cookie(response)[REFRESH_COOKIE].value
 
 
 def bearer(token: str) -> dict[str, str]:
@@ -59,7 +63,7 @@ async def post_refresh(client: AsyncClient, raw_token: str) -> Response:
     client.cookies.clear()
     return await client.post(
         f"{API}/auth/refresh",
-        headers={**CSRF_HEADER, "Cookie": f"refresh_token={raw_token}"},
+        headers={**CSRF_HEADER, "Cookie": f"{REFRESH_COOKIE}={raw_token}"},
     )
 
 
@@ -67,7 +71,7 @@ async def post_logout(client: AsyncClient, raw_token: str) -> Response:
     client.cookies.clear()
     return await client.post(
         f"{API}/auth/logout",
-        headers={**CSRF_HEADER, "Cookie": f"refresh_token={raw_token}"},
+        headers={**CSRF_HEADER, "Cookie": f"{REFRESH_COOKIE}={raw_token}"},
     )
 
 

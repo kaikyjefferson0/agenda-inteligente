@@ -7,6 +7,7 @@ export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
   NOT_AUTHENTICATED: 'Sua sessão terminou. Entre novamente.',
   INVALID_REFRESH_TOKEN: 'Sua sessão expirou. Entre novamente.',
   FORBIDDEN: 'Você não tem permissão para fazer isso.',
+  ORIGIN_NOT_ALLOWED: 'Não foi possível confirmar sua sessão neste endereço. Entre novamente.',
   REGISTRATION_DISABLED: 'O cadastro de novos negócios está desligado.',
   DEMO_RESTRICTED: 'Esta ação não está disponível no negócio de demonstração.',
   NOT_FOUND: 'Não encontramos o que você procurou.',

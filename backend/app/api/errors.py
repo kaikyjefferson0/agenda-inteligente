@@ -41,6 +41,11 @@ PROBLEMS: dict[ErrorCode, Problem] = {
     ErrorCode.FORBIDDEN: Problem(
         403, "Sem permissão", "Você não tem permissão para esta operação."
     ),
+    ErrorCode.ORIGIN_NOT_ALLOWED: Problem(
+        403,
+        "Origem não permitida",
+        "A requisição não veio de uma origem permitida.",
+    ),
     ErrorCode.REGISTRATION_DISABLED: Problem(
         403, "Cadastro desligado", "O cadastro de novos negócios está desligado."
     ),

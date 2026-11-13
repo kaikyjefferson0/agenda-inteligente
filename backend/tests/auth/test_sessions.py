@@ -12,8 +12,10 @@ from app.models import Business, Professional, RefreshToken, User
 from tests.auth.helpers import (
     API,
     CSRF_HEADER,
+    ORIGIN,
     OWNER_EMAIL,
     PASSWORD,
+    REFRESH_COOKIE,
     Clock,
     bearer,
     deactivate,
@@ -118,11 +120,11 @@ async def test_concurrent_registrations_have_a_single_winner(
 async def test_refresh_cookie_has_the_required_flags(client: AsyncClient) -> None:
     response = await register_owner(client)
 
-    morsel = refresh_cookie(response)["refresh_token"]
+    morsel = refresh_cookie(response)[REFRESH_COOKIE]
     assert morsel["httponly"] is True
     assert morsel["secure"] is True
     assert morsel["samesite"].lower() == "strict"
-    assert morsel["path"] == "/api/v1/auth"
+    assert morsel["path"] == "/"
     assert morsel["domain"] == ""
     assert int(morsel["max-age"]) == int(timedelta(days=7).total_seconds())
 
@@ -172,7 +174,7 @@ async def test_ct28_reused_refresh_revokes_the_whole_family(
 
     assert reuse.status_code == 401
     assert reuse.json()["code"] == "INVALID_REFRESH_TOKEN"
-    assert 'refresh_token=""' in reuse.headers["set-cookie"]
+    assert f'{REFRESH_COOKIE}=""' in reuse.headers["set-cookie"]
     family = await family_of(db, third.json()["access_token"])
     assert len(family) == 3
     assert all(token.revoked_at is not None for token in family)
@@ -204,7 +206,7 @@ async def test_ct38_concurrent_refreshes_have_one_winner_and_revoke_the_family(
     first = await register_owner(client)
     raw_token = raw_refresh_token(first)
     client.cookies.clear()
-    headers = {**CSRF_HEADER, "Cookie": f"refresh_token={raw_token}"}
+    headers = {**CSRF_HEADER, "Cookie": f"{REFRESH_COOKIE}={raw_token}"}
 
     responses = await asyncio.gather(
         client.post(f"{API}/auth/refresh", headers=headers),
@@ -266,7 +268,7 @@ async def test_refresh_just_before_seven_days_slides_the_validity(
     response = await post_refresh(client, raw_refresh_token(first))
 
     assert response.status_code == 200
-    max_age = int(refresh_cookie(response)["refresh_token"]["max-age"])
+    max_age = int(refresh_cookie(response)[REFRESH_COOKIE]["max-age"])
     assert max_age == int(timedelta(days=7).total_seconds())
 
 
@@ -280,13 +282,13 @@ async def test_ct43_session_in_use_ends_thirty_days_after_the_login(
         assert response.status_code == 200
 
     # Issued on day 24, so only 6 of the usual 7 days remain.
-    max_age = int(refresh_cookie(response)["refresh_token"]["max-age"])
+    max_age = int(refresh_cookie(response)[REFRESH_COOKIE]["max-age"])
     assert max_age == int(timedelta(days=6).total_seconds())
 
     clock.advance(timedelta(days=5, hours=23))
     response = await post_refresh(client, raw_refresh_token(response))
     assert response.status_code == 200
-    assert int(refresh_cookie(response)["refresh_token"]["max-age"]) == 3600
+    assert int(refresh_cookie(response)[REFRESH_COOKIE]["max-age"]) == 3600
 
     clock.advance(timedelta(hours=1))  # Exactly day 30.
     assert (await post_refresh(client, raw_refresh_token(response))).status_code == 401
@@ -300,7 +302,7 @@ async def test_new_login_starts_a_new_thirty_day_limit(
 
     response = await login(client)
 
-    max_age = int(refresh_cookie(response)["refresh_token"]["max-age"])
+    max_age = int(refresh_cookie(response)[REFRESH_COOKIE]["max-age"])
     assert max_age == int(timedelta(days=7).total_seconds())
 
 
@@ -343,7 +345,7 @@ async def test_logout_revokes_the_session_and_clears_the_cookie(
     response = await post_logout(client, raw_token)
 
     assert response.status_code == 204
-    assert 'refresh_token=""' in response.headers["set-cookie"]
+    assert f'{REFRESH_COOKIE}=""' in response.headers["set-cookie"]
     assert (await post_refresh(client, raw_token)).status_code == 401
     family = await family_of(db, first.json()["access_token"])
     assert all(token.revoked_at is not None for token in family)
@@ -374,6 +376,67 @@ async def test_logout_is_idempotent(client: AsyncClient) -> None:
     ).status_code == 204
 
 
+# Origin (D110)
+
+
+@mark.parametrize("route", ["refresh", "logout"])
+@mark.parametrize(
+    "origin",
+    [
+        None,
+        "",
+        "https://outro.app.test",
+        "http://app.test",
+        "https://app.test:8443",
+        "https://atacante.example.com",
+    ],
+    ids=["none", "empty", "sibling-subdomain", "http", "other-port", "other-site"],
+)
+async def test_cookie_routes_refuse_an_origin_outside_the_list(
+    client: AsyncClient, db: AsyncSession, route: str, origin: str | None
+) -> None:
+    first = await register_owner(client)
+    raw_token = raw_refresh_token(first)
+    client.cookies.clear()
+    headers = {
+        "X-Requested-With": "XMLHttpRequest",
+        "Cookie": f"{REFRESH_COOKIE}={raw_token}",
+    }
+    if origin is not None:
+        headers["Origin"] = origin
+
+    response = await client.post(f"{API}/auth/{route}", headers=headers)
+
+    assert response.status_code == 403
+    assert response.json()["code"] == "ORIGIN_NOT_ALLOWED"
+    assert "set-cookie" not in response.headers
+    # The token was not touched: it still rotates normally.
+    token = await db.scalar(select(RefreshToken))
+    assert token is not None
+    assert token.used_at is None
+    assert token.revoked_at is None
+
+
+async def test_cookie_routes_accept_any_origin_of_the_list(
+    client: AsyncClient, settings: Settings
+) -> None:
+    second = "https://outra-origem.test"
+    settings.cors_allowed_origins = f"{ORIGIN}, {second}"
+    first = await register_owner(client)
+    client.cookies.clear()
+
+    response = await client.post(
+        f"{API}/auth/refresh",
+        headers={
+            "X-Requested-With": "XMLHttpRequest",
+            "Origin": second,
+            "Cookie": f"{REFRESH_COOKIE}={raw_refresh_token(first)}",
+        },
+    )
+
+    assert response.status_code == 200
+
+
 # CSRF
 
 
@@ -388,7 +451,11 @@ async def test_ct42_cookie_routes_require_the_csrf_header(
 
     response = await client.post(
         f"{API}/auth/{route}",
-        headers={**headers, "Cookie": f"refresh_token={raw_token}"},
+        headers={
+            **headers,
+            "Origin": ORIGIN,
+            "Cookie": f"{REFRESH_COOKIE}={raw_token}",
+        },
     )
 
     assert response.status_code == 403
