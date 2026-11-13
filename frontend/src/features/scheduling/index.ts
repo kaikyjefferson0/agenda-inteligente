@@ -1,5 +1,7 @@
 // Shared by the public booking (UC10, UC11), the customer link (UC12 to UC14),
-// the team agenda (UC15 to UC18) and the working hours and blocks (UC08, UC09), D66.
+// the team agenda (UC15 to UC18), the working hours and blocks (UC08, UC09) and
+// the configuration of the Owner (UC04 to UC07), D66.
+export { AppointmentLinks } from './components/AppointmentLinks'
 export { ChoiceList, type Choice } from './components/ChoiceList'
 export { ContinueButton } from './components/ContinueButton'
 export { CopyLinkButton } from './components/CopyLinkButton'
@@ -44,3 +46,4 @@ export {
   type TimeBlock,
   type WorkingInterval,
 } from './staff-queries'
+export { conflictsOf, type ScheduledAppointment } from './conflicts'

@@ -1,6 +1,6 @@
 # 9. Frontend
 
-SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D76 e a D78 a D88 dos [Pontos a revisar](README.md#pontos-a-revisar); a D77 é do backend, sobre o motivo do `409` que a agenda usa.
+SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D76 e a D78 a D93 dos [Pontos a revisar](README.md#pontos-a-revisar); a D77 é do backend, sobre o motivo do `409` que a agenda usa.
 
 ## Estrutura de pastas
 
@@ -12,16 +12,19 @@ frontend/src/
 ├── app/          # Roteador e provedores (TanStack Query e tooltips)
 ├── components/
 │   ├── ui/       # Componentes do shadcn, instalados com npx shadcn add (D58)
-│   ├── layout/   # PublicLayout, PanelLayout, marca, link de pular e página provisória
+│   ├── layout/   # PublicLayout, PanelLayout, PanelPage (moldura das páginas de configuração), marca e link de pular
 │   ├── feedback/ # ErrorMessage, PageLoader e RouteError
 │   └── marketing/# Seção principal da página inicial (Magic, D58)
 ├── features/
-│   ├── scheduling/          # Compartilhado (D66): negócio, disponibilidade, dia e horário, selo, link, regras do cliente e consultas da equipe (D88)
+│   ├── scheduling/          # Compartilhado (D66): negócio, disponibilidade, dia e horário, selo, link, regras do cliente, consultas da equipe (D88) e lista de agendamentos com conflictsOf (D89)
 │   ├── booking/             # Agendamento público (UC10 e UC11): passos, formulário e sucesso
 │   ├── customer-appointment/# Link do cliente (UC12 a UC14): consulta, cancelamento e remarcação
 │   ├── auth/                # Sessão entre abas e telas de conta (UC02 a UC04, D70 a D76)
 │   ├── team-agenda/         # Agenda da equipe (UC15 a UC18, D78 a D84)
-│   └── work-schedule/       # Expediente e bloqueios (UC08 e UC09, D85 a D88)
+│   ├── work-schedule/       # Expediente e bloqueios (UC08 e UC09, D85 a D88)
+│   ├── services/            # Serviços (UC06, D90)
+│   ├── team/                # Equipe: convite, "Também atendo", desativação e serviços de cada um (UC04 e UC07, D91)
+│   └── business-settings/   # Negócio: nome, endereço, fuso e regras de reserva (UC05, D92)
 ├── hooks/        # Hooks compartilhados: use-mobile do sidebar e use-retry-after (D76)
 ├── lib/          # Funções puras: datas e fusos, esquema de cores, prévia da demo e utilitários
 ├── pages/        # Páginas por grupo de rotas: public/, account/, panel/ e a 404
@@ -45,7 +48,7 @@ Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam a
 | `/painel/servicos`, `/equipe`, `/expediente`, `/bloqueios`, `/negocio` | Configuração | Painel |
 | Qualquer outra | Página não encontrada | Principal |
 
-- `/`, `/n/:slug`, `/agendamento/:token`, as quatro rotas de conta, a agenda (`/painel`), o expediente, os bloqueios e a 404 são definitivas. As outras páginas do painel são provisórias, com o título e uma frase do que virá, mas já exigem sessão (D73) e respeitam o papel (D74).
+- Todas as rotas são definitivas. As do painel exigem sessão (D73) e respeitam o papel (D74): Serviços, Equipe e Negócio são só do Dono.
 - O cadastro de negócio (UC01, `POST /auth/register`) não tem rota no frontend: fica desligado na demo pública (RN27). A sugestão de `/cadastro` está nos [Pontos a revisar](README.md#pontos-a-revisar).
 - Cada grupo (público, conta e painel) é um módulo importado com `lazy`, que o Vite separa em um arquivo próprio. O layout público e a 404 ficam no arquivo principal.
 - Cada grupo tem um `errorElement` (`RouteError`), então um erro no painel não derruba as páginas públicas. Uma falha ao baixar o módulo, comum logo depois de um deploy, se resolve recarregando a página.
@@ -430,9 +433,9 @@ Medido na página renderizada, com o chrome-devtools, compondo os fundos transl�
 |---|---|
 | `week-draft.ts` | A semana em edição: leitura e corpo do `PUT`, adicionar, remover, copiar, comparar, resumo do dia e os problemas antes do envio (D85) |
 | `block-period.ts` | Início e fim do bloqueio do relógio do negócio para UTC, "Dia inteiro", sobreposição, próximos bloqueios e o texto de cada um (D86) |
-| `queries.ts` | Salvar o expediente, criar e remover bloqueio, com as invalidações (D88), e `conflictsOf`, que confere o `409` à mão |
+| `queries.ts` | Salvar o expediente, criar e remover bloqueio, com as invalidações (D88); `conflictsOf`, que confere o `409` à mão, foi para `scheduling` (D89) |
 | `use-schedule-professional.ts` | De quem é a tela: o próprio Profissional ou a escolha do Dono em `?profissional=` (D87) |
-| `components/` | `ScheduleShell` (título, fuso, seletor e estados), `WorkingHours`, `WorkingHoursEditor`, `DayEditor`, `TimeBlocks`, `TimeBlockForm`, `RemoveBlockDialog` e `AppointmentLinks` |
+| `components/` | `ScheduleShell` (título, fuso, seletor e estados), `WorkingHours`, `WorkingHoursEditor`, `DayEditor`, `TimeBlocks`, `TimeBlockForm` e `RemoveBlockDialog`; a lista de agendamentos (`AppointmentLinks`) vem de `scheduling` (D89) |
 
 ### Expediente (D85)
 
@@ -459,7 +462,7 @@ Medido na página renderizada, com o chrome-devtools, compondo os fundos transl�
 | `409 TIME_BLOCK_OVERLAP` | Relê os bloqueios e mostra o que atrapalha, com o dia, as horas e o motivo. O que foi digitado fica |
 | Rede, `5xx` e o resto | Mensagem do erro acima do botão |
 
-O OpenAPI não declara o `409` dessa rota, então `conflictsOf` confere o corpo à mão, no formato de `AppointmentData` ([Pontos a revisar](README.md#pontos-a-revisar)). Conferido com a API real: um dia inteiro sobre a agenda do Dono da demo listou os três agendamentos do dia.
+O OpenAPI não declara o `409` dessa rota, então `conflictsOf` (de `scheduling`, D89) confere o corpo à mão, no formato de `AppointmentData` ([Pontos a revisar](README.md#pontos-a-revisar)). Conferido com a API real: um dia inteiro sobre a agenda do Dono da demo listou os três agendamentos do dia.
 
 ### Papéis e agenda (D87, D88)
 
@@ -482,6 +485,86 @@ Medido na página renderizada, com o chrome-devtools, compondo os fundos transl�
 | Borda da caixa de dia (`input` / `background`) | — | 3.47 | 3 |
 
 "—": o par não estava na tela medida nesse modo.
+
+## Configuração do Dono (UC04 a UC07)
+
+`/painel/servicos`, `/painel/equipe` e `/painel/negocio` são só do Dono (`RequireOwner`, D74): um Profissional que abre uma delas pelo endereço volta para `/painel`. São telas de cadastro, usadas de vez em quando: formulários na própria página, sem modal, com campos de 44 px no celular e o erro de cada campo abaixo dele (`aria-describedby`). As páginas de `src/pages/panel` passam a cada funcionalidade o que ela precisa de `GET /auth/me` (D89); a moldura comum é o `PanelPage`, em `src/components/layout`.
+
+| Pasta | Arquivos |
+|---|---|
+| `services/` | `service-draft.ts` (preço em centavos, limites, corpo e mudanças do `PATCH`), `queries.ts` (criar e editar, com as invalidações da D93) e `components/` (`ServiceCatalog` e `ServiceForm`) |
+| `team/` | `situation.ts` (situação de cada um, ordem da lista e conferência do convite), `queries.ts` (convite, "Também atendo", desativação e serviços) e `components/` (`TeamManager`, `InviteForm`, `DeactivateDialog` e `MemberServices`) |
+| `business-settings/` | `durations.ts` (número e unidade), `settings-draft.ts` (limites, RN05 e mudanças do `PATCH`), `timezones.ts` (lista de fusos), `queries.ts` (`GET` e `PATCH /business`) e `components/` (`BusinessSettings` e `BusinessSettingsForm`) |
+
+### Serviços (D90)
+
+- **Lista:** os ativos e, à parte, os inativos ("Inativo", com ícone), cada um com duração, preparo, preço e "Editar" e "Desativar" ou "Reativar". Um serviço ativo que ninguém da equipe faz traz o aviso de que aparece sem horários na página pública (RN07). Sem serviços, um estado vazio leva ao primeiro.
+- **Formulário:** "Novo serviço" ou "Editar" abrem o formulário no lugar, com o foco no nome (ou na duração, quando o nome está travado). Abaixo dos campos, quanto cada agendamento ocupa na agenda (duração mais preparo, RN03).
+- **Preço:** em reais, convertido em centavos com conta de inteiros. `50`, `49,90`, `1.234,56`, `R$ 50` e `50.50` valem; `12,345` e `-5` são recusados no campo.
+- **Antes de enviar:** os limites da API, no campo ao sair dele e no envio, com o foco no primeiro problema. O `PATCH` leva só o que mudou.
+- **Desativar e reativar:** sem diálogo, porque a ação se desfaz. O aviso recebe o foco e diz o que acontece com a página pública e com os agendamentos (RN11).
+- **Demo (RN28):** um aviso explica as travas; não há "Novo serviço", e o nome fica só de leitura, com o cadeado e o motivo.
+
+| Resposta | Comportamento |
+|---|---|
+| `201` e `200` | O serviço entra na lista na hora, e um aviso com o foco diz o que fazer em seguida |
+| `422` com o campo | O texto próprio do campo, com o foco nele; nunca a mensagem do Pydantic |
+| `403 DEMO_RESTRICTED`, rede e `5xx` | A mensagem do erro dentro do formulário, que mantém o que foi digitado |
+
+### Equipe (D91)
+
+- **Lista:** o Dono primeiro, depois ativos e pendentes; os desativados ficam num grupo recolhido, sem ações. Cada linha tem nome, situação (ícone e texto), e-mail e os serviços, com os inativos marcados.
+- **Convite:** nome e e-mail, conferidos antes do envio. O sucesso diz para onde foi e até quando vale, no fuso do negócio, e recebe o foco; o pendente entra na lista. Convidar de novo um pendente, pelo formulário ou por "Reenviar convite", renova o link e diz que o anterior deixou de valer (RN24).
+- **"Também atendo":** no topo, quando o Dono não tem registro; na linha dele, quando deixou de atender. O aviso leva ao expediente.
+- **Desativar:** `AlertDialog` com o foco em "Manter na equipe", o texto de que é definitivo e envio único. Esc devolve o foco ao botão. Para o Dono, "Deixar de atender", com "Continuar atendendo" e sem o texto de definitivo (RN23). Um pendente não tem essa ação, porque prenderia o e-mail ([Pontos a revisar](README.md#pontos-a-revisar)).
+- **Serviços de cada um:** "Serviços" abre na linha uma caixa de 44 px por serviço, com o foco na primeira. "Salvar serviços" fica desligado sem mudança; depois de salvar, um aviso recebe o foco, e "Fechar" devolve o foco ao botão.
+
+| Resposta | Comportamento |
+|---|---|
+| `202` do convite | Aviso com o e-mail e a validade; os campos são limpos |
+| `409 EMAIL_IN_USE` | Texto no campo do e-mail, com o foco nele; muda ao editar o e-mail |
+| `429` do convite | Mensagem com o tempo de espera, e "Enviar convite" e "Reenviar convite" ficam em "Aguarde N min" (RN26) |
+| `409 APPOINTMENT_CONFLICTS` da desativação | O diálogo fecha; o aviso diz quantos agendamentos há pela frente ("Você tem…", para o Dono) e lista cada um com o link para o dia na agenda, filtrado pelo profissional |
+| `404` da desativação | O diálogo fecha, a lista é lida de novo, e um aviso explica |
+| Rede e `5xx` na desativação | A mensagem dentro do diálogo, que continua aberto para tentar de novo |
+
+### Negócio (D92)
+
+- **Página pública:** o endereço completo num campo só de leitura, com "Copiar link" (`CopyLinkButton`) e "Abrir a página pública". Mostra o `slug` salvo, e não o que está sendo digitado.
+- **Campos:** nome e endereço (com `/n/` na frente); fuso, num `<select>` nativo agrupado por região, com o Brasil primeiro; intervalo entre horários; antecedências e prazo. A antecedência mínima e o prazo usam número e unidade; a máxima, dias.
+- **Antes de enviar:** os limites da API e a mínima que não supera a máxima, mostrada na unidade da página ("não pode passar da máxima (30 dias)"). O foco vai ao primeiro problema.
+- **Fuso:** o `AlertDialog` explica, antes de salvar, o que muda. Depois, a lista de `appointments_outside_hours` usa o novo fuso e mostra o profissional de cada agendamento.
+- **Salvar:** a barra presa ao rodapé, como no expediente. O sucesso recebe o foco.
+- **Demo (RN28):** nome e endereço ficam só de leitura, com o cadeado e o motivo; o fuso e as regras de reserva continuam editáveis.
+
+| Resposta | Comportamento |
+|---|---|
+| `200` sem troca de fuso | "Configurações salvas. Elas valem para as próximas reservas." |
+| `200` com `appointments_outside_hours` | Quantos ficaram fora do expediente, que continuam marcados, e a lista com os links para a agenda |
+| `409 SLUG_IN_USE` | Texto no campo do endereço, com o foco nele |
+| `422` com o campo | O texto próprio do campo (por exemplo, um fuso que a API não conhece) |
+| `403`, rede e `5xx` | A mensagem do erro acima da barra, com o que foi digitado |
+
+### O que é invalidado (D93)
+
+Cada mudança grava a resposta no cache e invalida o que depende dela, também numa recusa. Serviços e equipe invalidam a agenda e todas as páginas públicas (`['public', 'business']`). O negócio invalida tudo de `['team']` e as páginas públicas, e a página invalida `['auth', 'me']`, de onde vêm o fuso, o nome e o `slug` da sessão.
+
+### Contraste da configuração
+
+Medido na página renderizada, com o chrome-devtools, compondo os fundos translúcidos:
+
+| Par | Claro | Escuro | Mínimo |
+|---|---|---|---|
+| Campo travado da demo e `/n/` (`muted-foreground` / `muted`) | 5.92 | 6.80 | 4.5 |
+| Motivo da trava, dicas e e-mail na equipe (`muted-foreground` / `card`) | 6.61 | 7.73 | 4.5 |
+| Intervalo escolhido (`accent-foreground` / `accent`) | 8.44 | 10.19 | 4.5 |
+| Intervalo não escolhido (`foreground` / `background`) | 16.94 | 17.40 | 4.5 |
+| Fuso no `<select>` (`foreground` sobre o fundo do campo) | — | 12.24 | 4.5 |
+| Texto da barra de salvar (`muted-foreground` / `background`) | 6.42 | 8.29 | 4.5 |
+| Selos "Atende" e "Ativo" (`success-soft-foreground` / `success-soft`) | 8.46 | — | 4.5 |
+| "Desativar" e "Deixar de atender" (`destructive` / `destructive/10` sobre `card`) | 4.86 | — | 4.5 |
+
+"—": o par não estava na tela medida nesse modo. O par do `<select>` no claro e os selos no escuro são os mesmos tokens da tabela de cores.
 
 ## Datas e fusos (D56)
 
@@ -512,21 +595,23 @@ As funções de `src/lib/datetime.ts` recebem sempre o fuso do negócio e nunca 
 
 ```bash
 npm run test           # Vitest
-npm run test:coverage  # com cobertura; mínimo de 80% em src/lib, src/api e em cada pasta de src/features, auth, team-agenda e work-schedule inclusive
+npm run test:coverage  # com cobertura; mínimo de 80% em src/lib, src/api e em cada pasta de src/features, inclusive services, team e business-settings
 npm run typecheck      # tsc -b
 npm run api:types      # regenera src/api/schema.d.ts
 ```
 
 - **Ambiente:** jsdom, com o processo em `TZ=Asia/Tokyo` (definido em `vite.config.ts`) e 15 s por teste, porque numa execução fria, como no CI, o primeiro teste de cada arquivo espera a transformação dos módulos do painel carregados sob demanda, para que qualquer uso do fuso do navegador apareça nos testes. O `setup.ts` substitui `matchMedia`, `ResizeObserver`, a captura de ponteiro e o `scrollIntoView`, que o jsdom não tem e o `Select` do Radix usa. Os testes da grade e da semana trocam o `matchMedia` para responder ao `(min-width: 1024px)` e o devolvem ao padrão depois. Os testes do agendamento fixam o relógio num instante em que o dia de São Paulo e o de Tóquio são diferentes, com `vi.useFakeTimers({ toFake: ['Date'] })`.
-- **API:** o MSW intercepta as requisições em `http://api.test`, o `VITE_API_BASE_URL` dos testes. Uma requisição sem handler faz o teste falhar. Cada teste troca as respostas com `server.use`. `src/test/msw/auth.ts` simula as rotas de `/auth` com estado (cookie, tokens emitidos e contadores por rota), e `src/test/msw/team-agenda.ts`, as rotas da equipe: a agenda de uma quinta-feira com um concluído, um começado à espera do resultado, dois por vir e um cancelado, a equipe e os serviços por papel, o expediente, a criação, a remarcação, o cancelamento e o resultado (que recusa antes do início), com as requisições e os corpos guardados. `src/test/msw/work-schedule.ts` simula, com estado, o expediente e os bloqueios: o `PUT` com o `appointments_outside_hours` escolhido no teste, os bloqueios compartilhados com a agenda, os dois `409` e o `403` de um Profissional fora do próprio cadastro.
+- **API:** o MSW intercepta as requisições em `http://api.test`, o `VITE_API_BASE_URL` dos testes. Uma requisição sem handler faz o teste falhar. Cada teste troca as respostas com `server.use`. `src/test/msw/auth.ts` simula as rotas de `/auth` com estado (cookie, tokens emitidos e contadores por rota), e `src/test/msw/team-agenda.ts`, as rotas da equipe: a agenda de uma quinta-feira com um concluído, um começado à espera do resultado, dois por vir e um cancelado, a equipe e os serviços por papel, o expediente, a criação, a remarcação, o cancelamento e o resultado (que recusa antes do início), com as requisições e os corpos guardados. `src/test/msw/work-schedule.ts` simula, com estado, o expediente e os bloqueios: o `PUT` com o `appointments_outside_hours` escolhido no teste, os bloqueios compartilhados com a agenda, os dois `409` e o `403` de um Profissional fora do próprio cadastro. `src/test/msw/configuration.ts` simula, com estado, o negócio, o catálogo e a equipe (que começam iguais aos da agenda e vêm antes deles na lista de handlers), o convite, "Também atendo", a desativação e os serviços de cada um, com uma recusa escolhida por rota (`configApi.refuse`) e os corpos guardados; `authApi.demo` faz o `GET /auth/me` responder como o negócio da demo. `src/test/panel.tsx` abre uma página do painel com sessão, pelo roteador real.
 - **Sessão:** cada teste começa com uma sessão nova, com lock, canal e indicação em memória. `src/test/session.ts` tem o `memoryBus`, que simula o `BroadcastChannel` entre várias "abas" no mesmo processo, e o `withOpenSession`, que simula um navegador já logado. O `VITE_DEMO_PASSWORD` dos testes é `senha-da-demo-de-teste`.
+- **Clique duplo e foco:** os testes de clique duplo conferem só que a requisição sai uma vez. Quando a resposta chega entre os dois cliques, o segundo clique devolve o foco ao botão, como faria uma pessoa, então o foco do aviso é conferido em testes de clique simples.
 - **Foco depois de uma resposta da API:** quando um componente move o foco num `useEffect` (título de sucesso, painel de resultado), a renderização vem da resposta do MSW, fora de `act()`, e o efeito pode rodar depois de o `findBy…` encontrar o elemento. O teste espera o foco com `await waitFor(() => expect(el).toHaveFocus())`, nunca com `expect` direto. O teste de clique duplo do agendamento usava `expect` direto e falhava em cerca de 3 de cada 20 execuções; a correção foi no teste, porque no navegador o efeito roda logo depois da pintura. Foco movido dentro de uma ação do `user-event`, que já roda em `act()`, ou de forma síncrona, como `setFocus` do React Hook Form, pode ser conferido direto.
-- **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; o roteador; preços e durações; o agendamento público (negócio e slug inexistente, horários no fuso do negócio, dia sem horários, teclado, parâmetros inválidos, idempotência com clique duplo e falha de rede, `409`, `429`, `422`, limite de e-mail, repetição sem link e tela de sucesso); a sessão e as telas de conta (renovação silenciosa com e sem a indicação, duas e três abas renovando ao mesmo tempo com um único `/auth/refresh`, aba nova sem refresh, login, logout e fim da sessão chegando às outras abas, `401` com nova tentativa, login com sucesso, erro e `429`, demonstração, rota protegida que redireciona e volta, `?voltar=` malicioso, papéis, RN30 em caracteres e `429` nas telas de senha); o link do cliente (os quatro status, prazo vencido, serviço desativado, link inválido, foco do diálogo com Esc, cancelamento com clique duplo, recusas definitivas, `429` e falha de rede, profissional e dia iniciais da remarcação, `409`, limite de e-mail e serviço que saiu da página); e a agenda da equipe (o dia de São Paulo com o processo em Tóquio e uma busca por semana, dias sem nova busca e a semana seguinte, filtro do Dono na URL e id desconhecido, Profissional só com a própria agenda, estado vazio e só com cancelados, erro com nova tentativa, grade por profissional e semana, agendamento manual com sucesso, com link, com checagem de passado e expediente, com `409` pelo `reason` e com `422` no telefone, cancelar com confirmação, Esc e clique duplo, recusa definitiva e falha de rede, remarcar para outro dia, `409` que mantém a escolha e `changed_meanwhile`, resultado antes e depois do início, não compareceu com confirmação, situação final sem ações, foco ao fechar as gavetas, período nas mudanças de horário, pistas da grade e faixas livres); e o expediente e os bloqueios (almoço como dois intervalos, fim antes do início e sobreposição recusados antes do envio, cópia entre dias, `appointments_outside_hours` com os links, invalidação da agenda, troca de profissional com alterações, bloqueio criado no fuso do negócio com o processo em Tóquio, horário inexistente e dia inteiro de 23 horas em Nova York, sobreposição conhecida e `409 TIME_BLOCK_OVERLAP`, `409` com conflitos, remoção com confirmação, Esc, clique duplo, falha e `404`, Dono com seletor e Profissional sem ele).
+- **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; o roteador; preços e durações; o agendamento público (negócio e slug inexistente, horários no fuso do negócio, dia sem horários, teclado, parâmetros inválidos, idempotência com clique duplo e falha de rede, `409`, `429`, `422`, limite de e-mail, repetição sem link e tela de sucesso); a sessão e as telas de conta (renovação silenciosa com e sem a indicação, duas e três abas renovando ao mesmo tempo com um único `/auth/refresh`, aba nova sem refresh, login, logout e fim da sessão chegando às outras abas, `401` com nova tentativa, login com sucesso, erro e `429`, demonstração, rota protegida que redireciona e volta, `?voltar=` malicioso, papéis, RN30 em caracteres e `429` nas telas de senha); o link do cliente (os quatro status, prazo vencido, serviço desativado, link inválido, foco do diálogo com Esc, cancelamento com clique duplo, recusas definitivas, `429` e falha de rede, profissional e dia iniciais da remarcação, `409`, limite de e-mail e serviço que saiu da página); e a agenda da equipe (o dia de São Paulo com o processo em Tóquio e uma busca por semana, dias sem nova busca e a semana seguinte, filtro do Dono na URL e id desconhecido, Profissional só com a própria agenda, estado vazio e só com cancelados, erro com nova tentativa, grade por profissional e semana, agendamento manual com sucesso, com link, com checagem de passado e expediente, com `409` pelo `reason` e com `422` no telefone, cancelar com confirmação, Esc e clique duplo, recusa definitiva e falha de rede, remarcar para outro dia, `409` que mantém a escolha e `changed_meanwhile`, resultado antes e depois do início, não compareceu com confirmação, situação final sem ações, foco ao fechar as gavetas, período nas mudanças de horário, pistas da grade e faixas livres); e o expediente e os bloqueios (almoço como dois intervalos, fim antes do início e sobreposição recusados antes do envio, cópia entre dias, `appointments_outside_hours` com os links, invalidação da agenda, troca de profissional com alterações, bloqueio criado no fuso do negócio com o processo em Tóquio, horário inexistente e dia inteiro de 23 horas em Nova York, sobreposição conhecida e `409 TIME_BLOCK_OVERLAP`, `409` com conflitos, remoção com confirmação, Esc, clique duplo, falha e `404`, Dono com seletor e Profissional sem ele); e a configuração do Dono (preço em centavos com conta de inteiros e os formatos aceitos, limites do serviço nas bordas, criar, editar só o que mudou, salvar sem mudança, desativar e reativar com clique duplo, `422` com o campo, travas da demo e `DEMO_RESTRICTED`, serviço sem profissional; situação de cada um e ordem da equipe, convite com sucesso e validade no fuso do negócio, conferência antes do envio, `EMAIL_IN_USE`, `429` que segura também o reenvio, renovação pelo botão e pelo formulário, convite desligado na demo, "Também atendo" com `201` e `200`, desativação com confirmação, Esc, clique duplo, `409` com a lista e os links, falha dentro do diálogo e `404`, "Deixar de atender" e o `409` do Dono, serviços do profissional com os inativos marcados e falha ao salvar; número e unidade, RN05 antes do envio, limites, só o que mudou, `slug` em minúsculas e `SLUG_IN_USE`, `422` do fuso, troca de fuso com aviso, desistência e `appointments_outside_hours` no novo fuso, travas da demo; as invalidações da D93; e o Profissional levado de volta para `/painel` nas três páginas).
 - **CI:** o job do frontend roda ESLint, `typecheck`, `test:coverage`, a conferência da D51 e o build.
 
 ## Uso dos MCPs (D58)
 
 - **shadcn:** consulte os componentes pelo MCP e instale com `npx shadcn add <nome>`. Eles ficam em `src/components/ui` e só mudam para traduzir textos, atender às regras de lint ou alcançar o contraste AA (como a variante `destructive` do botão e do selo). Quando o CLI pede para sobrescrever um componente já ajustado, como o `button.tsx` ao instalar o `alert-dialog`, a resposta é não. O `Slot` do Radix junta as classes sem o `tailwind-merge`, então um tamanho passado a `AlertDialogCancel` precisa do `!`.
-- **Magic:** só em componentes de destaque: a seção principal de `/` e a escolha de dia e horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion. O `DateTimePicker` veio do "Time Slot Picker" (21st.dev, klyv-ui, id 43217), que não tem dependências. Manteve os dois grupos de rádio navegáveis pelo teclado e o fuso sempre impresso. Trocou as datas no fuso do navegador pelas de `src/lib/datetime.ts`, a carga de todos os dias pela de um dia por vez, as cores pelos tokens e os alvos para 44 px, e passou a agrupar os horários por período. O link do cliente reaproveita o mesmo `DateTimePicker` e não tem componente de destaque novo, então não usou o Magic. A grade da agenda (`TimeGrid`) veio do "Event Manager" (21st.dev, vaib215, id 9127), das visões de dia e de semana, que não têm dependências fora da D50. Manteve a coluna de horas e uma coluna por dia. Trocou os blocos presos à célula da hora pelo minuto exato do relógio do negócio, as datas do navegador pelas de `src/lib/datetime.ts`, o arrastar e soltar por um clique que abre a gaveta e as cores fixas pelos tokens; acrescentou as colunas por profissional, as pistas de sobreposição, o preparo hachurado, o cabeçalho e as horas fixos e a linha "agora". O `tabs`, o `select` e o `collapsible` entraram pelo `npx shadcn add`, sem sobrescrever o `button.tsx`. O expediente e os bloqueios também não usaram: o editor da semana é uma lista de campos nativos de hora, sem um componente de destaque, e um componente de agenda semanal com arrastar traria dependência fora da D50 e alvos pequenos no celular. O `checkbox` entrou pelo `npx shadcn add` (o CLI não sobrescreveu nada), e o padrão do exemplo, o rótulo inteiro como alvo de 44 px com o estado marcado na borda e no fundo, foi adaptado aos tokens `primary` e `accent`. As telas de conta também não usaram: são formulários de tarefa, e o único ponto de destaque, o acesso à demonstração, é uma lista de dois botões feita com os componentes existentes. O `input-group` (e o `textarea`, que vem com ele) entrou pelo `npx shadcn add`, e o CLI não sobrescreveu `button.tsx` nem `input.tsx`.
+- **Magic:** só em componentes de destaque: a seção principal de `/` e a escolha de dia e horário. O resultado é adaptado aos tokens, sem cores fixas e sem dependências fora da D50. A moldura de celular da hero veio do "Great UI Mobile Mockup" (21st.dev, id 23322, MIT), sem o framer-motion. O `DateTimePicker` veio do "Time Slot Picker" (21st.dev, klyv-ui, id 43217), que não tem dependências. Manteve os dois grupos de rádio navegáveis pelo teclado e o fuso sempre impresso. Trocou as datas no fuso do navegador pelas de `src/lib/datetime.ts`, a carga de todos os dias pela de um dia por vez, as cores pelos tokens e os alvos para 44 px, e passou a agrupar os horários por período. O link do cliente reaproveita o mesmo `DateTimePicker` e não tem componente de destaque novo, então não usou o Magic. A grade da agenda (`TimeGrid`) veio do "Event Manager" (21st.dev, vaib215, id 9127), das visões de dia e de semana, que não têm dependências fora da D50. Manteve a coluna de horas e uma coluna por dia. Trocou os blocos presos à célula da hora pelo minuto exato do relógio do negócio, as datas do navegador pelas de `src/lib/datetime.ts`, o arrastar e soltar por um clique que abre a gaveta e as cores fixas pelos tokens; acrescentou as colunas por profissional, as pistas de sobreposição, o preparo hachurado, o cabeçalho e as horas fixos e a linha "agora". O `tabs`, o `select` e o `collapsible` entraram pelo `npx shadcn add`, sem sobrescrever o `button.tsx`. O expediente e os bloqueios também não usaram: o editor da semana é uma lista de campos nativos de hora, sem um componente de destaque, e um componente de agenda semanal com arrastar traria dependência fora da D50 e alvos pequenos no celular. O `checkbox` entrou pelo `npx shadcn add` (o CLI não sobrescreveu nada), e o padrão do exemplo, o rótulo inteiro como alvo de 44 px com o estado marcado na borda e no fundo, foi adaptado aos tokens `primary` e `accent`. A configuração do Dono (serviços, equipe e negócio) também não usou: são telas de cadastro, sem um componente de destaque, e o padrão das outras telas do painel (listas, formulários na própria página e `AlertDialog`) serve melhor que um componente importado. O `native-select` entrou pelo `npx shadcn add`, sem sobrescrever nada, para o fuso (com `optgroup` por região) e as unidades, porque um `<select>` nativo é o mais confortável no celular para uma lista longa; a altura de 44 px vem da página (`[&_select]:h-11`). O `table` chegou a entrar e saiu antes do fim: as linhas de serviço viram formulário na própria lista, o que uma tabela não comporta. As telas de conta também não usaram: são formulários de tarefa, e o único ponto de destaque, o acesso à demonstração, é uma lista de dois botões feita com os componentes existentes. O `input-group` (e o `textarea`, que vem com ele) entrou pelo `npx shadcn add`, e o CLI não sobrescreveu `button.tsx` nem `input.tsx`.
 - **chrome-devtools:** cada página nova ou alterada é conferida em 375 px e 1280 px, nos modos claro e escuro, sem rolagem horizontal, sem erros no console, com o contraste dos pares da tabela medido na página e o foco conferido pelo teclado.
+- **Skills de design:** na configuração do Dono, a UI/UX Pro Max e a Impeccable foram consultadas antes dos componentes, só para formulários (erro no campo ao sair dele, foco no primeiro problema, retorno visível depois de salvar, ação destrutiva com confirmação). Ficaram de fora o toast e a tabela com TanStack Table, que trariam dependências fora da D50, e qualquer design system gravado em arquivo (D62).
 - **Arquivos de design system (D62):** nada de `design-system/`, `PRODUCT.md` ou `DESIGN.md` no repositório. A referência é `src/index.css` mais esta seção.

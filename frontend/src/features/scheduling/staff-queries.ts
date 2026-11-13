@@ -17,6 +17,10 @@ export type TimeBlock = components['schemas']['TimeBlockData']
  * the agenda.
  */
 export const teamKeys = {
+  /** Everything the panel reads: a new time zone changes all of it (D93). */
+  all: ['team'] as const,
+  /** The settings of the business (UC05), only for the Owner. */
+  business: ['team', 'business'] as const,
   agendaAll: ['team', 'agenda'] as const,
   agenda: (weekStart: string, professionalId: string | null) =>
     ['team', 'agenda', weekStart, professionalId ?? 'todos'] as const,

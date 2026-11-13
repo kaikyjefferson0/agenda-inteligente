@@ -7,7 +7,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
-import { workingHoursQuery, type Professional, type WorkingInterval } from '@/features/scheduling'
+import {
+  AppointmentLinks,
+  workingHoursQuery,
+  type Professional,
+  type WorkingInterval,
+} from '@/features/scheduling'
 
 import { useSaveWorkingHours, type WorkingHoursUpdate } from '../queries'
 import {
@@ -23,7 +28,6 @@ import {
   WEEKDAYS,
   type WeekDraft,
 } from '../week-draft'
-import { AppointmentLinks } from './AppointmentLinks'
 import { DayEditor } from './DayEditor'
 
 interface WorkingHoursEditorProps {

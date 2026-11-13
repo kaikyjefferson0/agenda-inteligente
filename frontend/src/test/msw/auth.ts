@@ -43,6 +43,8 @@ export const authApi = {
   calls: { login: 0, refresh: 0, logout: 0, me: 0, forgot: 0, reset: 0, accept: 0 },
   /** Wait before answering the refresh, so two tabs overlap. */
   refreshDelayMs: 0,
+  /** The business of the session is the demo (RN28). */
+  demo: false,
   bodies: [] as unknown[],
 
   reset() {
@@ -51,6 +53,7 @@ export const authApi = {
     this.issued = 0
     this.tokens.clear()
     this.refreshDelayMs = 0
+    this.demo = false
     this.bodies = []
     for (const key of Object.keys(this.calls) as (keyof typeof this.calls)[]) this.calls[key] = 0
   },
@@ -109,7 +112,9 @@ export const authHandlers = [
     authApi.calls.me += 1
     const token = request.headers.get('Authorization')?.replace('Bearer ', '') ?? ''
     if (!authApi.tokens.has(token)) return problem(401, 'NOT_AUTHENTICATED')
-    return HttpResponse.json(meOf(authApi.role))
+    const me = meOf(authApi.role)
+    me.business.is_demo = authApi.demo
+    return HttpResponse.json(me)
   }),
   http.post(`${API}/auth/password/forgot`, async ({ request }) => {
     authApi.calls.forgot += 1
