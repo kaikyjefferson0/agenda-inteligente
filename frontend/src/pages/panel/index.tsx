@@ -1,12 +1,14 @@
 // Panel group (D54): loaded on demand as one chunk, together with its layout.
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
 import { ErrorMessage } from '@/components/feedback/ErrorMessage'
 import { PageLoader } from '@/components/feedback/PageLoader'
 import { PanelLayout } from '@/components/layout/PanelLayout'
-import { PlaceholderPage } from '@/components/layout/PlaceholderPage'
 import { meQuery, RequireOwner, usePanelAccount } from '@/features/auth'
+import { BusinessSettings } from '@/features/business-settings'
+import { ServiceCatalog } from '@/features/services'
+import { TeamManager } from '@/features/team'
 import { TeamAgenda } from '@/features/team-agenda'
 import { TimeBlocks, WorkingHours, type ScheduleAccount } from '@/features/work-schedule'
 
@@ -44,26 +46,27 @@ export function AgendaPage() {
   )
 }
 
+/** UC06, only for the Owner (D74, D90). */
 export function ServicesPage() {
   return (
     <RequireOwner>
-      <PlaceholderPage
-        title="Serviços"
-        description="Aqui o Dono vai criar, editar e desativar serviços, com duração, preparo e preço."
-      />
+      <WithAccount title="Serviços">{(account) => <ServiceCatalog account={account} />}</WithAccount>
     </RequireOwner>
   )
 }
 
+/** UC04 and UC07, only for the Owner (D74, D91). */
 export function TeamPage() {
   return (
     <RequireOwner>
-      <PlaceholderPage
-        title="Equipe"
-        description="Aqui o Dono vai convidar e desativar profissionais e escolher os serviços de cada um."
-      />
+      <WithAccount title="Equipe">{(account) => <TeamManager account={account} />}</WithAccount>
     </RequireOwner>
   )
+}
+
+/** What a page of the panel hands to its feature: each one takes the part it needs. */
+interface PanelAccount extends ScheduleAccount {
+  isDemo: boolean
 }
 
 /**
@@ -75,7 +78,7 @@ function WithAccount({
   children,
 }: {
   title: string
-  children: (account: ScheduleAccount) => ReactNode
+  children: (account: PanelAccount) => ReactNode
 }) {
   const me = useQuery(meQuery)
   if (me.data === undefined) {
@@ -96,6 +99,7 @@ function WithAccount({
     userId: me.data.user.id,
     isOwner: me.data.user.role === 'owner',
     timeZone: me.data.business.timezone,
+    isDemo: me.data.business.is_demo,
   })
 }
 
@@ -109,13 +113,15 @@ export function TimeBlocksPage() {
   return <WithAccount title="Bloqueios">{(account) => <TimeBlocks account={account} />}</WithAccount>
 }
 
+/**
+ * UC05, only for the Owner (D74, D92). The name, the slug and the time zone of
+ * the session come from `GET /auth/me`: saving reads it again (D93).
+ */
 export function BusinessSettingsPage() {
+  const queryClient = useQueryClient()
   return (
     <RequireOwner>
-      <PlaceholderPage
-        title="Negócio"
-        description="Aqui o Dono vai alterar nome, endereço, fuso, passo da grade, antecedência e prazo de alteração."
-      />
+      <BusinessSettings onSaved={() => void queryClient.invalidateQueries({ queryKey: meQuery.queryKey })} />
     </RequireOwner>
   )
 }

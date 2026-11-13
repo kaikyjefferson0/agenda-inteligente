@@ -11,7 +11,13 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
-import { teamKeys, type TimeBlock } from '@/features/scheduling'
+import {
+  AppointmentLinks,
+  conflictsOf,
+  teamKeys,
+  type ScheduledAppointment,
+  type TimeBlock,
+} from '@/features/scheduling'
 
 import {
   blockPeriodOf,
@@ -20,8 +26,7 @@ import {
   type BlockField,
   type BlockInput,
 } from '../block-period'
-import { conflictsOf, useCreateTimeBlock, type ScheduledAppointment } from '../queries'
-import { AppointmentLinks } from './AppointmentLinks'
+import { useCreateTimeBlock } from '../queries'
 
 const REASON_MAX = 500
 

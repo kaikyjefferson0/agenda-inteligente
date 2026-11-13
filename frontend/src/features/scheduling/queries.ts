@@ -25,6 +25,8 @@ export interface AvailabilityParams {
 const normalize = (slug: string) => slug.toLowerCase()
 
 export const schedulingKeys = {
+  /** Every public page of a business: the configuration of the Owner invalidates them all (D93). */
+  all: ['public', 'business'] as const,
   business: (slug: string) => ['public', 'business', normalize(slug)] as const,
   availabilityOf: (slug: string) =>
     ['public', 'business', normalize(slug), 'availability'] as const,
