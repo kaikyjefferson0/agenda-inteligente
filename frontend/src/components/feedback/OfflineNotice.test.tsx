@@ -47,7 +47,7 @@ describe('the strip of "sem conexão" (D99)', () => {
         <RouterProvider router={router} />
       </Providers>,
     )
-    await screen.findByRole('heading', { level: 1 }, { timeout: 10_000 })
+    await screen.findByRole('heading', { level: 1 })
     goOffline()
     expect(strip()).toBeInTheDocument()
     goOnline()

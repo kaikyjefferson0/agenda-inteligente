@@ -26,8 +26,10 @@ export async function renderPanel(path: string, role: 'owner' | 'professional', 
       <RouterProvider router={router} />
     </Providers>,
   )
+  // The first opening of the panel in each test: its group is loaded on demand (D54) and, cold and
+  // under the load of the whole suite, takes longer than the default wait of setup.ts.
   await screen.findByRole('heading', { level: 1, name: heading }, { timeout: 10_000 })
   // The frame of the page shows its title while it reads who is in: wait for the page itself.
-  await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull(), { timeout: 10_000 })
+  await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull())
   return { router, user, queryClient }
 }

@@ -33,7 +33,8 @@ async function renderAgenda(path = '/painel', role: 'owner' | 'professional' = '
       <RouterProvider router={router} />
     </Providers>,
   )
-  // The panel group is loaded on demand (D54): the first import, under the load of the whole suite, takes longer.
+  // The first opening of the panel in each test: its group is loaded on demand (D54) and, cold and
+  // under the load of the whole suite, takes longer than the default wait of setup.ts.
   await screen.findByRole('heading', { level: 1, name: 'Agenda' }, { timeout: 10_000 })
   return { router, user }
 }
@@ -43,7 +44,7 @@ const where = (router: Awaited<ReturnType<typeof renderAgenda>>['router']) =>
 
 /** The day list of the phone. */
 async function dayList() {
-  return within(await screen.findByRole('list', { name: 'Agendamentos do dia' }, { timeout: 5_000 }))
+  return within(await screen.findByRole('list', { name: 'Agendamentos do dia' }))
 }
 
 /** The card (phone) of a customer, which opens the sheet. */
@@ -115,8 +116,7 @@ describe('agenda of the day (UC15)', () => {
     await dayList()
 
     await user.click(screen.getByRole('button', { name: 'Próximo dia' }))
-    // Under the load of the whole suite with coverage, the new day may take longer than the default 1 s.
-    expect(await screen.findByText('sexta-feira, 13/11/2026', {}, { timeout: 5_000 })).toBeInTheDocument()
+    expect(await screen.findByText('sexta-feira, 13/11/2026')).toBeInTheDocument()
     expect((await dayList()).getByRole('button', { name: /Helena Reis/ })).toBeInTheDocument()
     expect(where(router)).toBe('/painel?dia=2026-11-13')
     expect(teamApi.agendaRequests).toHaveLength(1)
