@@ -1,3 +1,7 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.appointments import router as appointments_router
@@ -15,13 +19,22 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.time_blocks import router as time_blocks_router
 from app.core.config import get_settings
 from app.core.log_filters import install_customer_token_filter
+from app.jobs.in_process import background_tasks
 
 API_PREFIX = "/api/v1"
 
 # D24: before the first request, both under uvicorn and in the tests.
 install_customer_token_filter()
 
-app = AgendaApi(title="Agenda Inteligente API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """D105 and D106: the worker and the restoration, when turned on."""
+    async with background_tasks(get_settings()):
+        yield
+
+
+app = AgendaApi(title="Agenda Inteligente API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CustomerLinkHeadersMiddleware,
     path_prefix=f"{API_PREFIX}{customer_link_router.prefix}",

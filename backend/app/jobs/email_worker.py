@@ -4,6 +4,10 @@ Each cycle reserves a batch in a short transaction, sends it outside any
 transaction and writes each result in another short one. A worker that dies
 mid-way leaves reservations that expire, so delivery is "at least once"; the
 message id is the idempotency key that lets the provider drop a repeat.
+
+The same loop runs the daily cleanup of D115, because every installation has a
+worker: its own process in development, a task inside the API in production
+(D105, `app/jobs/in_process.py`).
 """
 
 import asyncio
@@ -11,7 +15,7 @@ import logging
 import signal
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -28,14 +32,19 @@ from app.domain.email_retry import (
     error_summary,
     is_expired,
 )
+from app.domain.rate_limits import ONE_DAY
 from app.email.factory import build_sender
 from app.email.rendering import TemplateError, render
 from app.email.sender import EmailDeliveryError, EmailSender
+from app.jobs.cleanup import clean_up
 from app.models import EmailOutboxStatus
 from app.repositories import email_outbox
 
 BATCH_SIZE = 20
 POLL_INTERVAL_SECONDS = 5.0
+# D115: once a day; after a failure, an hour later.
+CLEANUP_INTERVAL = ONE_DAY
+CLEANUP_RETRY = timedelta(hours=1)
 
 logger = logging.getLogger(__name__)
 
@@ -159,11 +168,16 @@ async def serve(
     """Runs a cycle every `interval` seconds until `stop` is set.
 
     A full batch is followed at once by the next one. A failed cycle, such as
-    the database being down, is logged by type and tried again later.
+    the database being down, is logged by type and tried again later. The
+    cleanup of D115 runs on the first cycle and then once a day.
     """
+    next_cleanup: datetime | None = None
     while not stop.is_set():
+        now = clock()
+        if next_cleanup is None or now >= next_cleanup:
+            next_cleanup = now + await _clean_up(session_factory, now)
         try:
-            handled = await run_once(session_factory, sender, clock())
+            handled = await run_once(session_factory, sender, now)
         except Exception as exc:
             logger.error("email worker cycle failed: %s", type(exc).__name__)
             handled = 0
@@ -173,6 +187,16 @@ async def serve(
             await asyncio.wait_for(stop.wait(), timeout=interval)
         except TimeoutError:
             pass
+
+
+async def _clean_up(session_factory: SessionFactory, now: datetime) -> timedelta:
+    """Returns how long until the next cleanup. A failure never stops the sends."""
+    try:
+        await clean_up(session_factory, now)
+    except Exception as exc:
+        logger.error("cleanup failed: %s", type(exc).__name__)
+        return CLEANUP_RETRY
+    return CLEANUP_INTERVAL
 
 
 async def _main() -> None:

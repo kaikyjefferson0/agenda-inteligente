@@ -5,6 +5,7 @@ foreign keys use ON DELETE RESTRICT, so the dependents go first.
 """
 
 from collections.abc import Iterable, Sequence
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -34,6 +35,17 @@ _Target = tuple[type[Base], ColumnElement[bool], InstrumentedAttribute[Any]]
 async def lock_restoration(session: AsyncSession, key: int) -> None:
     """D45: held until the transaction ends, so restorations run one at a time."""
     await session.execute(select(func.pg_advisory_xact_lock(key)))
+
+
+async def restored_at(session: AsyncSession) -> datetime | None:
+    """D106: when the demo was last restored, from the business every run recreates.
+
+    With more than one demo business, the oldest: the restoration then refuses
+    to run (D46), and the refusal shows in the log.
+    """
+    return await session.scalar(
+        select(func.min(Business.created_at)).where(Business.is_demo.is_(True))
+    )
 
 
 async def list_demo_business_ids(session: AsyncSession) -> list[UUID]:
@@ -127,7 +139,7 @@ async def delete_business(session: AsyncSession, business_id: UUID) -> dict[str,
 async def insert_rows(
     session: AsyncSession, model: type[Base], rows: Sequence[dict[str, Any]]
 ) -> int:
-    """Inserts in one statement; the timestamps come from the server defaults."""
+    """Inserts in one statement; missing timestamps come from the server defaults."""
     if rows:
         await session.execute(insert(model), list(rows))
     return len(rows)
