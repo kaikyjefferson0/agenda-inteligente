@@ -22,7 +22,11 @@ export const queryDefaults: DefaultOptions = {
     staleTime: 30_000,
   },
   // A mutation may have reached the API: repeating it could book twice.
-  mutations: { retry: false },
+  // Without a network it fails at once, with the message of connection, and
+  // never waits to go by itself when the network returns: cancelling or
+  // booking minutes later, without the person seeing it, is worse (D99).
+  // Reads keep the default `online` mode: they pause and resume.
+  mutations: { retry: false, networkMode: 'always' },
 }
 
 export function createQueryClient(overrides: DefaultOptions = {}): QueryClient {

@@ -6,29 +6,20 @@
  * never reaches the API becomes a `NetworkError`.
  */
 
-/** Stable codes of the API (docs/07-api.md, "Códigos de erro"). */
-export type ApiErrorCode =
-  | 'INVALID_TOKEN'
-  | 'INVALID_CREDENTIALS'
-  | 'NOT_AUTHENTICATED'
-  | 'INVALID_REFRESH_TOKEN'
-  | 'FORBIDDEN'
-  | 'REGISTRATION_DISABLED'
-  | 'DEMO_RESTRICTED'
-  | 'NOT_FOUND'
-  | 'SLOT_UNAVAILABLE'
-  | 'CHANGE_DEADLINE_PASSED'
-  | 'INVALID_STATUS_TRANSITION'
-  | 'IDEMPOTENCY_KEY_REUSED'
-  | 'APPOINTMENT_CONFLICTS'
-  | 'TIME_BLOCK_OVERLAP'
-  | 'EMAIL_IN_USE'
-  | 'SLUG_IN_USE'
-  | 'VALIDATION_ERROR'
-  | 'RATE_LIMITED'
-  | 'DATABASE_UNAVAILABLE'
-  | 'HTTP_ERROR'
-  | 'INTERNAL_ERROR'
+import type { components } from './schema'
+
+/** Stable codes of the API, generated from the `ErrorCode` enum of the OpenAPI (D97). */
+export type ApiErrorCode = components['schemas']['ErrorCode']
+
+/**
+ * Codes whose body has fields of its own, declared in the OpenAPI (D94): the
+ * type comes from `schema.d.ts`, never from a check by hand (D97).
+ */
+export interface TypedProblems {
+  APPOINTMENT_CONFLICTS: components['schemas']['AppointmentConflictsProblem']
+  TIME_BLOCK_OVERLAP: components['schemas']['TimeBlockOverlapProblem']
+  SLOT_UNAVAILABLE: components['schemas']['StaffConflictProblem']
+}
 
 /** One item of `errors` in a `422`, with the location joined by dots. */
 export interface FieldError {
@@ -150,6 +141,16 @@ export async function toApiError(response: Response): Promise<ApiError> {
       response.status === 429 ? parseRetryAfter(response.headers.get('Retry-After')) : null,
     body,
   })
+}
+
+/**
+ * The body of an `ApiError` with this `code`, typed as the OpenAPI declares it
+ * (D97), or `null` for any other error. The API tests check each real body
+ * against its schema (D94), so the client trusts the contract here, in one place.
+ */
+export function problemOf<C extends keyof TypedProblems>(error: unknown, code: C): TypedProblems[C] | null {
+  if (!(error instanceof ApiError) || error.code !== code || error.body === null) return null
+  return error.body as unknown as TypedProblems[C]
 }
 
 /** By name: the `DOMException` of fetch may come from another realm. */

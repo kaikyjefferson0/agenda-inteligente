@@ -42,13 +42,12 @@ export function useInvite() {
 
 /**
  * "Também atendo": `201` creates the record of the Owner, `200` brings it
- * back to the bookings. The OpenAPI has no body for the `200`, but the API
- * answers the same `ProfessionalData` (D91).
+ * back to the bookings; both with `ProfessionalData` (D91, D94).
  */
 export function useStartServing() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async () => (await unwrap(api.POST('/api/v1/professionals/me'))) as Professional,
+    mutationFn: () => unwrap(api.POST('/api/v1/professionals/me')),
     onSuccess: (professional) => keep(queryClient, professional),
     onSettled: () => invalidateTeam(queryClient),
   })
@@ -86,5 +85,31 @@ export function useSetServices(professionalId: string) {
     onSuccess: (professional) => keep(queryClient, professional),
     onSettled: () =>
       Promise.all([invalidateTeam(queryClient), queryClient.invalidateQueries({ queryKey: teamKeys.services })]),
+  })
+}
+
+/**
+ * D96 and D98: `DELETE /professionals/{id}/invitation` (`204`) deletes the
+ * pending account with its record, services, working hours and blocks; the
+ * link stops working and the e-mail is free for a new invite. The answer
+ * takes the person out of the list at once, before the new read.
+ */
+export function useCancelInvitation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (professionalId: string) =>
+      unwrap(
+        api.DELETE('/api/v1/professionals/{professional_id}/invitation', {
+          params: { path: { professional_id: professionalId } },
+        }),
+      ),
+    onSuccess: (_data, professionalId) => {
+      queryClient.setQueryData<Professional[]>(teamKeys.professionals, (list) =>
+        list?.filter((item) => item.id !== professionalId),
+      )
+      queryClient.removeQueries({ queryKey: teamKeys.workingHours(professionalId) })
+      queryClient.removeQueries({ queryKey: teamKeys.timeBlocks(professionalId) })
+    },
+    onSettled: () => invalidateTeam(queryClient),
   })
 }

@@ -43,5 +43,7 @@ export function usePanelAccount() {
           },
     logout: () => logout.mutate(),
     loggingOut: logout.isPending,
+    /** While false, the panel leaves without asking about changes not saved (D100). */
+    sessionActive: session.status === 'authenticated',
   }
 }

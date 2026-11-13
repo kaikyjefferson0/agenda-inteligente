@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 
+import { OfflineNotice } from '@/components/feedback/OfflineNotice'
 import { Brand } from '@/components/layout/Brand'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,12 +15,13 @@ export function NotFoundContent() {
   return (
     <main id="conteudo" className="flex min-h-svh flex-col py-6">
       <title>Página não encontrada | Agenda Inteligente</title>
+      <OfflineNotice />
       <div className="mx-auto w-full max-w-5xl px-4">
         <Brand />
       </div>
       <Empty className="mx-auto max-w-md px-4">
         <EmptyHeader>
-          <EmptyTitle className="text-2xl font-semibold">
+          <EmptyTitle className="text-[2rem] leading-[1.1] font-semibold text-balance sm:text-[2.375rem]">
             <h1>Esta página não está na agenda</h1>
           </EmptyTitle>
           <EmptyDescription>

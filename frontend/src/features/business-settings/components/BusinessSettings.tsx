@@ -41,7 +41,7 @@ export function BusinessSettings({ onSaved }: BusinessSettingsProps) {
     body = (
       <>
         {settings.data.is_demo ? (
-          <Alert>
+          <Alert role="status">
             <InfoIcon aria-hidden="true" />
             <AlertTitle>Negócio de demonstração</AlertTitle>
             <AlertDescription>

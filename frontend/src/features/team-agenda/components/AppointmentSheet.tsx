@@ -192,7 +192,8 @@ function SheetBody({
 
       <div ref={noticeRef} tabIndex={-1} role="status" className="empty:hidden">
         {notice !== null ? (
-          <Alert>
+          // The wrapper is the live region already: no second one inside it.
+          <Alert role={undefined}>
             {notice.tone === 'success' ? <CheckIcon aria-hidden="true" /> : <InfoIcon aria-hidden="true" />}
             <AlertTitle>{notice.title}</AlertTitle>
             {notice.text !== null ? <AlertDescription>{notice.text}</AlertDescription> : null}

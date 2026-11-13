@@ -7,6 +7,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@/components/ui/input-group'
+import { cn } from '@/lib/utils'
 
 /**
  * Password with a button to show it while typing. Paste and the password
@@ -25,7 +26,7 @@ export function PasswordInput({ className, ...props }: ComponentProps<'input'>) 
         autoCapitalize="none"
         autoCorrect="off"
         spellCheck={false}
-        className={className}
+        className={cn('h-full', className)}
       />
       <InputGroupAddon align="inline-end" className="py-0 pr-0 has-[>button]:mr-0">
         <InputGroupButton

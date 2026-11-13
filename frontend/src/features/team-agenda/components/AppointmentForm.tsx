@@ -12,6 +12,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { customerFieldOf, SelectField, SERVER_FIELD_MESSAGES } from '@/features/scheduling'
 import { toUtcInstant } from '@/lib/datetime'
 import { formatDuration, formatPrice } from '@/lib/format'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 import { appointmentSchema, type AppointmentInput, type AppointmentValues } from '../appointment-schema'
 import { refusalMessage, slotProblemMessage, slotRefusalOf } from '../messages'
@@ -91,6 +92,7 @@ export function AppointmentForm({
     mode: 'onTouched',
   })
   const mutation = useCreateAppointment()
+  useUnsavedChanges(form.formState.isDirty)
   const [refusal, setRefusal] = useState<string | null>(null)
   const [failure, setFailure] = useState<unknown>(null)
   const [timeTouched, setTimeTouched] = useState(false)

@@ -47,7 +47,7 @@ export function LoginScreen() {
       aside={<DemoAccess />}
     >
       {notice !== null ? (
-        <Alert>
+        <Alert role="status">
           <InfoIcon aria-hidden="true" />
           <AlertDescription className="text-foreground">{notice}</AlertDescription>
         </Alert>

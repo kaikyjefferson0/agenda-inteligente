@@ -100,7 +100,8 @@ describe('business page (UC10)', () => {
     renderPage()
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Barbearia Demo' })).toBeInTheDocument()
-    expect(screen.getByRole('note')).toHaveTextContent('Este é um negócio de demonstração')
+    // Information, not an error: a status, never an alert.
+    expect(screen.getByText('Este é um negócio de demonstração').closest('[role="status"]')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: 'Escolha o serviço' })).toBeInTheDocument()
 
     const corte = screen.getByRole('radio', { name: 'Corte' })
@@ -172,7 +173,7 @@ describe('day and time (UC10)', () => {
     expect(screen.getByRole('radiogroup', { name: /Manhã$/ })).toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: /Tarde$/ })).toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: /Noite$/ })).toBeInTheDocument()
-    expect(screen.getByText(/fuso do negócio \(America\/Sao Paulo\)/)).toBeInTheDocument()
+    expect(screen.getByText(/fuso do negócio \(São Paulo e Brasília\)/)).toBeInTheDocument()
 
     expect(queries[0].get('date')).toBe('2026-11-10')
     expect(queries[0].get('service_id')).toBe(SERVICE_ID)
@@ -376,7 +377,7 @@ describe('customer data and booking (UC11)', () => {
     expect(link).toHaveValue('https://app.exemplo.com/agendamento/token-de-teste')
 
     await user.click(screen.getByRole('button', { name: 'Copiar link' }))
-    expect(await screen.findByRole('status')).toHaveTextContent('Link copiado.')
+    expect(await screen.findByText('Link copiado.')).toHaveAttribute('role', 'status')
     await expect(navigator.clipboard.readText()).resolves.toBe(
       'https://app.exemplo.com/agendamento/token-de-teste',
     )
@@ -394,7 +395,7 @@ describe('customer data and booking (UC11)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Copiar link' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('copie com o menu do aparelho')
+    expect(await screen.findByText(/copie com o menu do aparelho/)).toHaveAttribute('role', 'status')
     expect(screen.getByRole('textbox', { name: 'Link do seu agendamento' })).toHaveFocus()
   })
 

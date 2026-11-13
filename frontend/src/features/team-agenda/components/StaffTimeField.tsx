@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatMinutes } from '@/lib/datetime'
 import { formatDuration } from '@/lib/format'
+import { timeZoneName } from '@/lib/timezone-name'
 
 import { formatRanges } from '../slot-check'
 import type { SlotContext } from '../use-slot-context'
@@ -99,14 +100,14 @@ export function StaffTimeField({
       </div>
       {problem !== null ? <FieldError id={problemId}>{problem}</FieldError> : null}
       {refusal !== null ? (
-        <Alert variant="destructive" role="alert">
+        <Alert variant="destructive">
           <CircleAlertIcon aria-hidden="true" />
           <AlertDescription className="text-destructive">{refusal}</AlertDescription>
         </Alert>
       ) : null}
 
       <div id={helpId} className="flex flex-col gap-2 text-sm text-muted-foreground">
-        <p>Horário no fuso do negócio ({timeZone.replaceAll('_', ' ')}), em qualquer minuto.</p>
+        <p>Horário no fuso do negócio ({timeZoneName(timeZone)}), em qualquer minuto.</p>
         {context.loading ? (
           <div aria-busy="true" className="flex flex-col gap-2">
             <span className="sr-only">Carregando o expediente…</span>

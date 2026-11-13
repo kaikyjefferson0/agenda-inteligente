@@ -83,7 +83,7 @@ describe('working hours (UC08)', () => {
     const { router, user } = await renderPage('/painel/expediente')
 
     expect(await screen.findByRole('combobox', { name: 'Profissional' })).toHaveTextContent('Dona Ana (você)')
-    expect(screen.getByText(/Horários no fuso do negócio, America\/Sao Paulo/)).toBeInTheDocument()
+    expect(screen.getByText(/Horários no fuso do negócio \(São Paulo e Brasília\)/)).toBeInTheDocument()
     expect((await day('Segunda-feira')).getByText(summary('09:00–12:00 e 13:00–19:00'))).toBeInTheDocument()
     expect((await day('Domingo')).getByText('Fechado')).toBeInTheDocument()
 

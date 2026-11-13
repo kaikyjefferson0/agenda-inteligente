@@ -165,6 +165,92 @@ describe('team (UC04, UC07, D91)', () => {
     expect(await screen.findByText('Convites desligados na demonstração')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Enviar convite' })).not.toBeInTheDocument()
     expect((await row('Dani Rocha')).queryByRole('button', { name: /Reenviar/ })).not.toBeInTheDocument()
+    expect((await row('Dani Rocha')).queryByRole('button', { name: /Cancelar convite/ })).not.toBeInTheDocument()
+  })
+
+  it('says until when a pending invite is valid, in the time zone of the business (D98)', async () => {
+    const expired: Professional = {
+      ...DANI,
+      id: '9a0c1e2f-0000-4000-8000-00000000000e',
+      user_id: '9a0c1e2f-0000-4000-8000-0000000000ef',
+      name: 'Edu Prado',
+      email: 'edu@exemplo.com',
+      invitation_expires_at: '2026-11-10T02:30:00Z',
+    }
+    configApi.team = [...configApi.members(), DANI, expired]
+    await open()
+    // 16:00 UTC is 13:00 in São Paulo; in Tokyo it would already be Friday, 01:00.
+    expect((await row('Dani Rocha')).getByText(/Entra nas reservas quando aceitar o convite/)).toHaveTextContent(
+      'que expira em quinta-feira, 19/11/2026 às 13:00.',
+    )
+    // 02:30 UTC of Tuesday is still Monday, 23:30, in São Paulo.
+    expect((await row('Edu Prado')).getByText(/O convite venceu em/)).toHaveTextContent(
+      'O convite venceu em segunda-feira, 09/11/2026 às 23:30. Reenvie para mandar um novo link.',
+    )
+  })
+
+  it('cancels a pending invite only after a confirmation (D96, D98)', async () => {
+    configApi.team = [...configApi.members(), DANI]
+    const { user, queryClient } = await open()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    const trigger = (await row('Dani Rocha')).getByRole('button', { name: 'Cancelar convite de Dani Rocha' })
+    await user.click(trigger)
+
+    const dialog = await screen.findByRole('alertdialog', { name: 'Cancelar o convite de Dani Rocha?' })
+    expect(dialog).toHaveTextContent('O link enviado para dani@exemplo.com deixa de valer na hora')
+    expect(dialog).toHaveTextContent('O e-mail fica livre')
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Manter convite' })).toHaveFocus())
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+    expect(configApi.calls.cancelInvite).toBe(0)
+
+    await user.click(trigger)
+    const again = await screen.findByRole('alertdialog')
+    await user.dblClick(within(again).getByRole('button', { name: 'Cancelar convite' }))
+
+    const notice = await screen.findByText(
+      'Convite de Dani Rocha cancelado. O link deixou de valer, e dani@exemplo.com pode ser convidado de novo.',
+    )
+    await waitFor(() => expect(notice.closest('[tabindex="-1"]')).toHaveFocus())
+    expect(configApi.calls.cancelInvite).toBe(1)
+    expect(screen.queryByRole('listitem', { name: 'Dani Rocha' })).not.toBeInTheDocument()
+    const keys = invalidate.mock.calls.map(([filters]) => filters?.queryKey)
+    expect(keys).toEqual(expect.arrayContaining([['team', 'professionals'], ['team', 'agenda'], ['public', 'business']]))
+  })
+
+  it('explains INVITATION_NOT_PENDING when the invite was accepted meanwhile', async () => {
+    configApi.team = [...configApi.members(), { ...DANI }]
+    const { user } = await open()
+    await user.click((await row('Dani Rocha')).getByRole('button', { name: 'Cancelar convite de Dani Rocha' }))
+    const dialog = await screen.findByRole('alertdialog')
+    // Accepted while the dialog was open: the API answers 409 INVITATION_NOT_PENDING.
+    const dani = configApi.members().find((member) => member.id === DANI.id)!
+    Object.assign(dani, { invitation_pending: false, invitation_expires_at: null, is_bookable: true })
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar convite' }))
+
+    const title = await screen.findByText('O convite de Dani Rocha não está mais pendente')
+    await waitFor(() => expect(title.closest('[tabindex="-1"]')).toHaveFocus())
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    // The team is read again, and the row shows where she stands now.
+    await waitFor(async () => expect((await row('Dani Rocha')).getByText('Ativo')).toBeInTheDocument())
+    expect((await row('Dani Rocha')).queryByRole('button', { name: /Cancelar convite/ })).not.toBeInTheDocument()
+  })
+
+  it('keeps the cancel dialog open on a failure, and closes on a 404', async () => {
+    configApi.team = [...configApi.members(), DANI]
+    configApi.refuse.cancelInvite = { status: 503, code: 'DATABASE_UNAVAILABLE' }
+    const { user } = await open()
+    await user.click((await row('Dani Rocha')).getByRole('button', { name: 'Cancelar convite de Dani Rocha' }))
+    const dialog = await screen.findByRole('alertdialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar convite' }))
+    expect(await within(dialog).findByText('Não foi possível cancelar o convite')).toBeInTheDocument()
+
+    configApi.refuse.cancelInvite = { status: 404, code: 'NOT_FOUND' }
+    await user.click(within(dialog).getByRole('button', { name: 'Cancelar convite' }))
+    expect(await screen.findByText('Dani Rocha não está mais na equipe')).toBeInTheDocument()
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
 
   it('lets the Owner start serving when there is no record (201)', async () => {

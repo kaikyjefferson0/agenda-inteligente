@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { Spinner } from '@/components/ui/spinner'
 import { formatDuration } from '@/lib/format'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 import { useCreateService, useUpdateService } from '../queries'
 import {
@@ -56,6 +57,8 @@ export function ServiceForm({ service, isDemo, onSaved, onCancel }: ServiceFormP
   const [showAll, setShowAll] = useState(false)
   const [serverProblems, setServerProblems] = useState<ServiceProblems>({})
   const [failure, setFailure] = useState<unknown>(null)
+  const initial = draftOf(service)
+  useUnsavedChanges(SERVICE_FIELDS.some((field) => draft[field] !== initial[field]))
   const create = useCreateService()
   const update = useUpdateService()
   const sending = useRef(false)
@@ -167,7 +170,7 @@ export function ServiceForm({ service, isDemo, onSaved, onCancel }: ServiceFormP
         inputMode="numeric"
         autoComplete="off"
         aria-describedby={describedBy(field, hintId)}
-        className="text-base tabular-nums"
+        className="h-full text-base tabular-nums"
       />
       <InputGroupAddon align="inline-end">
         <InputGroupText className="text-[0.9375rem]">min</InputGroupText>
@@ -215,7 +218,7 @@ export function ServiceForm({ service, isDemo, onSaved, onCancel }: ServiceFormP
               autoComplete="off"
               placeholder="0,00"
               aria-describedby={describedBy('price')}
-              className="text-base tabular-nums"
+              className="h-full text-base tabular-nums"
             />
           </InputGroup>,
         )}

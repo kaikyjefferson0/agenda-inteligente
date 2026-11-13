@@ -71,7 +71,7 @@ export function BookingSuccess({ booking, timeZone, email, onStartOver }: Bookin
       </dl>
 
       {repeated ? (
-        <Alert>
+        <Alert role="status">
           <MailIcon aria-hidden="true" />
           <AlertTitle>O link foi enviado para o seu e-mail</AlertTitle>
           <AlertDescription>
@@ -96,7 +96,7 @@ export function BookingSuccess({ booking, timeZone, email, onStartOver }: Bookin
               readOnly
               value={booking.access_url ?? ''}
               onFocus={(event) => event.currentTarget.select()}
-              className="h-11 min-w-0 flex-1 font-mono text-sm"
+              className="h-11 min-w-0 font-mono text-sm sm:flex-1"
             />
             <CopyLinkButton value={booking.access_url ?? ''} fieldRef={field} />
           </div>

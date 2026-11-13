@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Spinner } from '@/components/ui/spinner'
 import type { Professional, Service } from '@/features/scheduling'
 import { formatDuration, formatPrice } from '@/lib/format'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 import { useSetServices } from '../queries'
 
@@ -35,6 +36,7 @@ export function MemberServices({ professional, services, onClose }: MemberServic
   const statusRef = useRef<HTMLDivElement>(null)
   const firstBox = useRef<HTMLButtonElement>(null)
   const dirty = !sameSet(chosen, new Set(professional.service_ids))
+  useUnsavedChanges(dirty)
 
   useEffect(() => firstBox.current?.focus(), [])
   useEffect(() => {

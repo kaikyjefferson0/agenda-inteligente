@@ -14,6 +14,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatLocalDate, formatTime, localHour } from '@/lib/datetime'
 import { cn } from '@/lib/utils'
+import { timeZoneName } from '@/lib/timezone-name'
 
 import { targetIndex } from '../radio-keys'
 import { DayStrip, type DayStripHandle } from './DayStrip'
@@ -143,7 +144,7 @@ export function DateTimePicker({
         )}
 
         <p className="text-sm text-muted-foreground">
-          Horários no fuso do negócio ({timeZone.replaceAll('_', ' ')}).
+          Horários no fuso do negócio ({timeZoneName(timeZone)}).
         </p>
       </div>
     </div>

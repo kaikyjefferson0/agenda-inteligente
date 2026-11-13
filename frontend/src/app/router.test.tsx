@@ -79,7 +79,8 @@ describe('router (D54)', () => {
     renderAt(path)
 
     expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: title })).toHaveAttribute('aria-current', 'page')
+    // The pages of the Owner join the menu once `GET /auth/me` answers.
+    expect(await screen.findByRole('link', { name: title })).toHaveAttribute('aria-current', 'page')
   })
 
   it('shows the error element of the group when a page fails', async () => {

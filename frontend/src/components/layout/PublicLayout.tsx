@@ -1,5 +1,6 @@
 import { Link, Outlet } from 'react-router'
 
+import { OfflineNotice } from '@/components/feedback/OfflineNotice'
 import { Button } from '@/components/ui/button'
 
 import { Brand } from './Brand'
@@ -20,6 +21,7 @@ export function PublicLayout() {
           </nav>
         </div>
       </header>
+      <OfflineNotice />
       <main id="conteudo" className="flex flex-1 flex-col">
         <Outlet />
       </main>

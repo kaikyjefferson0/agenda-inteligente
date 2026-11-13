@@ -23,7 +23,7 @@ export function LinkNotFound() {
         <EmptyMedia variant="icon">
           <LinkIcon aria-hidden="true" />
         </EmptyMedia>
-        <EmptyTitle className="text-2xl font-semibold">
+        <EmptyTitle className="text-[2rem] leading-[1.1] font-semibold text-balance sm:text-[2.375rem]">
           <h1>Este link não abre mais o agendamento</h1>
         </EmptyTitle>
         <EmptyDescription>
