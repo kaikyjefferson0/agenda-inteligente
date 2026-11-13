@@ -36,6 +36,13 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    // D102: the E2E serves the production build here. The proxy is the one
+    // above (preview.proxy defaults to server.proxy).
+    preview: {
+      host: true,
+      port: 5174,
+      strictPort: true,
+    },
     test: {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],

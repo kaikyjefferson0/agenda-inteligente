@@ -180,6 +180,8 @@ A demo guarda apenas nome, e-mail e telefone do agendamento, e a restauração n
 
 O `docker-compose.yml` sobe `db`, `api`, `worker`, `mailpit` e `frontend`. O `worker` usa o mesmo build e as mesmas variáveis da `api` e roda `python -m app.jobs.email_worker`; ele para de forma limpa com `SIGTERM` e `SIGINT`. Em desenvolvimento, o e-mail vai por SMTP ao Mailpit, um servidor de e-mail falso cuja interface web, em `http://localhost:8025`, mostra as mensagens enviadas. As portas do Mailpit (8025 e 1025) ficam publicadas só em `127.0.0.1`. Nada é gravado no log, porque as mensagens levam links com token e o e-mail do cliente (D35). A restauração da demo não tem serviço próprio: roda sob demanda, com `docker compose run --rm api python -m app.jobs.restore_demo`. Os segredos ficam em variáveis de ambiente, e o repositório inclui somente um `.env.example`.
 
+Os testes de ponta a ponta usam outro arquivo, o `docker-compose.e2e.yml`, num projeto próprio (`agenda-e2e`) com as portas 5175 (build de produção do frontend) e 8003 (API) e um banco `agenda_e2e` em memória, recriado a cada execução por `python -m app.scripts.prepare_e2e_database`, que recusa um banco sem `_e2e` no nome (D102). `npm run test:e2e`, no frontend, faz tudo.
+
 Variáveis principais:
 
 | Variável | Uso |
@@ -210,7 +212,7 @@ Em cada pull request:
 5. **Ponta a ponta:** Playwright nos fluxos E2E01 e E2E02.
 6. **Imagens:** build das imagens Docker.
 
-Os itens 1, 2, 3, 4 e 6 já rodam em `.github/workflows/ci.yml`, junto com a conferência do contrato da API (D51). O Playwright entra com os fluxos E2E01 e E2E02.
+Todos rodam em `.github/workflows/ci.yml`, junto com a conferência do contrato da API (D51). O job `e2e` sobe o `docker-compose.e2e.yml` (build de produção do frontend, API e um banco `agenda_e2e` recriado a cada execução, D102) e roda o Playwright no Chromium, em `Asia/Tokyo`. No CI, um teste instável falha o job, e o relatório, os traces, as capturas e os logs dos contêineres ficam como artefatos (D104).
 
 ## Deploy
 

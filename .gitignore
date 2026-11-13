@@ -17,6 +17,11 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Playwright (D104)
+playwright-report/
+test-results/
+blob-report/
+
 # Sistema e editores
 .DS_Store
 Thumbs.db

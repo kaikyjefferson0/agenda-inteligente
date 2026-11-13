@@ -128,10 +128,10 @@ O merge é bloqueado abaixo de:
 
 | ID | Fluxo |
 |---|---|
-| E2E01 | Cliente agenda na página pública, abre o link e cancela; o horário volta a ficar livre |
-| E2E02 | Usuário faz login e vê a agenda |
+| E2E01 | Cliente agenda na página pública da demo, num horário escolhido pelo que a página mostra; abre o link pela tela de sucesso e cancela; depois, o mesmo horário volta a aparecer livre (D103) |
+| E2E02 | A equipe entra pela demonstração e pelo formulário, como Dono e como Profissional, e vê a agenda do dia no fuso do negócio; o Profissional não vê o menu do Dono (D74, D103) |
 
-Os testes usam um adaptador falso de e-mail, nunca o provedor real.
+Os dois fluxos rodam contra o sistema real, com o build de produção do frontend, a API e um banco próprio recriado a cada execução (D102). O navegador fica em `Asia/Tokyo`, em celular (390 px) e desktop (1280 px). A API usa o adaptador falso de e-mail, nunca o provedor real. Comando, portas e repetições no CI: [Frontend](09-frontend.md#testes-d57) e D104.
 
 ## Rastreabilidade
 
@@ -148,7 +148,7 @@ Validações simples e operações de CRUD de cada caso de uso são testadas em 
 | UC07 | CT08 |
 | UC08 | CT25 |
 | UC09 | CT17, CT31, CT72 |
-| UC10 | CT01, CT02, CT03, CT04, CT05 |
+| UC10 | CT01, CT02, CT03, CT04, CT05, E2E01 |
 | UC11 | CT06, CT07, CT08, CT09, CT22, CT23, CT24, CT27, CT30, CT31, CT36, CT57, CT68, E2E01 |
 | UC12 | CT11, CT36, CT49, CT50, E2E01 |
 | UC13 | CT03, CT12, CT47, CT48, CT49, CT57, E2E01 |

@@ -109,6 +109,53 @@ jobs:
       - name: Build
         run: npm run build
 
+  # D102 to D104: the whole system (production build of the frontend, API and
+  # a database of its own) from docker-compose.e2e.yml, with Playwright on the
+  # runner. A flaky test fails the job (failOnFlakyTests).
+  e2e:
+    name: Ponta a ponta (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependências
+        run: npm ci
+      # The browsers of the project's own Playwright, so the versions match.
+      - name: Versão do Playwright
+        id: playwright
+        run: echo "version=$(npx playwright --version | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+      - name: Cache dos navegadores
+        id: browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Instalar o Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Dependências de sistema do Chromium
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+      - name: Testes ponta a ponta
+        run: npm run test:e2e
+      - name: Guardar relatório, traces e capturas
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-${{ github.run_attempt }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
   docker:
     name: Imagens Docker
     runs-on: ubuntu-latest
