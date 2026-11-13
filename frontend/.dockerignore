@@ -3,3 +3,6 @@ dist/
 *.tsbuildinfo
 .env
 coverage/
+playwright-report/
+test-results/
+blob-report/

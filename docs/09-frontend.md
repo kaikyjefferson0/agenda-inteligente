@@ -1,6 +1,6 @@
 # 9. Frontend
 
-SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D76, a D78 a D93 e a D97 a D101 dos [Pontos a revisar](README.md#pontos-a-revisar); a D77 é do backend, sobre o motivo do `409` que a agenda usa.
+SPA com Vite, React, TypeScript, Tailwind CSS e shadcn/ui, na pasta `frontend/`. As decisões do frontend são a D50 a D76, a D78 a D93 e a D97 a D101 dos [Pontos a revisar](README.md#pontos-a-revisar); a D77 é do backend, sobre o motivo do `409` que a agenda usa. Os testes de ponta a ponta seguem a D102 a D104.
 
 ## Estrutura de pastas
 
@@ -29,6 +29,8 @@ frontend/src/
 ├── lib/          # Funções puras: datas e fusos, nome do fuso em português (D101), esquema de cores, prévia da demo e utilitários
 ├── pages/        # Páginas por grupo de rotas: public/, account/, panel/ e a 404
 └── test/         # Configuração do Vitest e servidor do MSW com os handlers
+
+frontend/e2e/     # Playwright (D102 a D104): run.mjs, support.ts e os testes E2E01 e E2E02
 ```
 
 Os testes ficam ao lado do código, como `datetime.test.ts`. As páginas ficam agrupadas por grupo de rotas, e não em uma lista plana, porque cada grupo é um módulo carregado sob demanda (D54). `features/` reúne, por funcionalidade, os componentes, as consultas do TanStack Query e os formulários; as páginas apenas os compõem. Uma funcionalidade nunca importa de outra: o que duas usam fica em `scheduling` (D66).
@@ -623,7 +625,8 @@ O fuso aparece pelo nome, nunca pelo nome IANA: `timeZoneName`, em `src/lib/time
 ```bash
 npm run test           # Vitest
 npm run test:coverage  # com cobertura; mínimo de 80% em src/lib, src/api e em cada pasta de src/features, inclusive services, team e business-settings
-npm run typecheck      # tsc -b
+npm run test:e2e       # Playwright com o sistema completo (D102); precisa do Docker
+npm run typecheck      # tsc -b, inclusive e2e/ e playwright.config.ts
 npm run api:types      # regenera src/api/schema.d.ts
 ```
 
@@ -633,7 +636,25 @@ npm run api:types      # regenera src/api/schema.d.ts
 - **Clique duplo e foco:** os testes de clique duplo conferem só que a requisição sai uma vez. Quando a resposta chega entre os dois cliques, o segundo clique devolve o foco ao botão, como faria uma pessoa, então o foco do aviso é conferido em testes de clique simples.
 - **Foco depois de uma resposta da API:** quando um componente move o foco num `useEffect` (título de sucesso, painel de resultado), a renderização vem da resposta do MSW, fora de `act()`, e o efeito pode rodar depois de o `findBy…` encontrar o elemento. O teste espera o foco com `await waitFor(() => expect(el).toHaveFocus())`, nunca com `expect` direto. O teste de clique duplo do agendamento usava `expect` direto e falhava em cerca de 3 de cada 20 execuções; a correção foi no teste, porque no navegador o efeito roda logo depois da pintura. Foco movido dentro de uma ação do `user-event`, que já roda em `act()`, ou de forma síncrona, como `setFocus` do React Hook Form, pode ser conferido direto.
 - **Cobertura:** datas e fusos, inclusive o horário de verão de São Paulo de 2018 e 2019 e um fuso sem horário de verão; o cliente da API (dados tipados, `problem+json`, `Retry-After`, rede, cabeçalhos e política de repetição); o componente de erro; o roteador; preços e durações; o agendamento público (negócio e slug inexistente, horários no fuso do negócio, dia sem horários, teclado, parâmetros inválidos, idempotência com clique duplo e falha de rede, `409`, `429`, `422`, limite de e-mail, repetição sem link e tela de sucesso); a sessão e as telas de conta (renovação silenciosa com e sem a indicação, duas e três abas renovando ao mesmo tempo com um único `/auth/refresh`, aba nova sem refresh, login, logout e fim da sessão chegando às outras abas, `401` com nova tentativa, login com sucesso, erro e `429`, demonstração, rota protegida que redireciona e volta, `?voltar=` malicioso, papéis, RN30 em caracteres e `429` nas telas de senha); o link do cliente (os quatro status, prazo vencido, serviço desativado, link inválido, foco do diálogo com Esc, cancelamento com clique duplo, recusas definitivas, `429` e falha de rede, profissional e dia iniciais da remarcação, `409`, limite de e-mail e serviço que saiu da página); e a agenda da equipe (o dia de São Paulo com o processo em Tóquio e uma busca por semana, dias sem nova busca e a semana seguinte, filtro do Dono na URL e id desconhecido, Profissional só com a própria agenda, estado vazio e só com cancelados, erro com nova tentativa, grade por profissional e semana, agendamento manual com sucesso, com link, com checagem de passado e expediente, com `409` pelo `reason` e com `422` no telefone, cancelar com confirmação, Esc e clique duplo, recusa definitiva e falha de rede, remarcar para outro dia, `409` que mantém a escolha e `changed_meanwhile`, resultado antes e depois do início, não compareceu com confirmação, situação final sem ações, foco ao fechar as gavetas, período nas mudanças de horário, pistas da grade e faixas livres); e o expediente e os bloqueios (almoço como dois intervalos, fim antes do início e sobreposição recusados antes do envio, cópia entre dias, `appointments_outside_hours` com os links, invalidação da agenda, troca de profissional com alterações, bloqueio criado no fuso do negócio com o processo em Tóquio, horário inexistente e dia inteiro de 23 horas em Nova York, sobreposição conhecida e `409 TIME_BLOCK_OVERLAP`, `409` com conflitos, remoção com confirmação, Esc, clique duplo, falha e `404`, Dono com seletor e Profissional sem ele); e a configuração do Dono (preço em centavos com conta de inteiros e os formatos aceitos, limites do serviço nas bordas, criar, editar só o que mudou, salvar sem mudança, desativar e reativar com clique duplo, `422` com o campo, travas da demo e `DEMO_RESTRICTED`, serviço sem profissional; situação de cada um e ordem da equipe, convite com sucesso e validade no fuso do negócio, conferência antes do envio, `EMAIL_IN_USE`, `429` que segura também o reenvio, renovação pelo botão e pelo formulário, convite desligado na demo, "Também atendo" com `201` e `200`, desativação com confirmação, Esc, clique duplo, `409` com a lista e os links, falha dentro do diálogo e `404`, "Deixar de atender" e o `409` do Dono, serviços do profissional com os inativos marcados e falha ao salvar; número e unidade, RN05 antes do envio, limites, só o que mudou, `slug` em minúsculas e `SLUG_IN_USE`, `422` do fuso, troca de fuso com aviso, desistência e `appointments_outside_hours` no novo fuso, travas da demo; as invalidações da D93; e o Profissional levado de volta para `/painel` nas três páginas); o acabamento (validade do convite no fuso do negócio, vigente e vencida, com o processo em Tóquio; cancelar convite com confirmação, Esc, clique duplo, invalidações, `INVITATION_NOT_PENDING`, falha dentro do diálogo e `404`; botão ausente na demo; a faixa de sem conexão aparecendo e sumindo no painel e nas páginas públicas, sem tirar os dados da tela; a mutação sem rede que falha na hora e não sai sozinha depois; e a saída sem alterações, com alterações mantidas ou descartadas, depois de salvar, antes do "Sair", o `beforeunload` e o fim da sessão em outra aba, que nunca é barrado).
-- **CI:** o job do frontend roda ESLint, `typecheck`, `test:coverage`, a conferência da D51 e o build.
+- **CI:** o job do frontend roda ESLint, `typecheck`, `test:coverage`, a conferência da D51 e o build; o job `e2e` roda `npm run test:e2e` (D104).
+
+### Ponta a ponta (D102 a D104)
+
+```bash
+npx playwright install chromium        # uma vez: o Chromium da versão do Playwright do projeto
+npm run test:e2e                       # sobe o sistema, roda os testes e desliga tudo
+npm run test:e2e -- --headed           # os argumentos vão para o playwright test
+npm run test:e2e -- --project=celular  # só um projeto: desktop ou celular
+npm run test:e2e -- --keep             # deixa o sistema no ar em http://localhost:5175
+npx playwright show-report             # relatório HTML da última execução
+npx playwright show-trace test-results/<teste>/trace.zip
+```
+
+- **Sistema:** `docker-compose.e2e.yml`, projeto `agenda-e2e`. Portas no host, só em `127.0.0.1`: **5175** (build de produção do frontend, com `vite preview`) e **8003** (API, para depurar). O banco não é publicado. Não conflita com o desenvolvimento (5174, 8002, 5433), com o Mailpit (8025, 1025) nem com o Estoque Inteligente.
+- **Ordem:** `run.mjs` remove uma execução anterior, constrói as imagens e sobe o banco, roda `prepare_e2e_database` (recria `agenda_e2e`, aplica as migrações e restaura a demo; recusa qualquer banco sem `_e2e` no fim), sobe a API e o frontend com `--wait` nos healthchecks, roda o Playwright e, no fim, `down -v`. Com falha, grava os logs dos contêineres em `test-results/docker-compose.log`.
+- **Testes:** `e2e01-agendar-e-cancelar.spec.ts` e `e2e02-equipe-ve-a-agenda.spec.ts`, nos projetos `desktop` (1280 px) e `celular` (390 px), no Chromium, em `Asia/Tokyo` e `pt-BR`, com um worker só. Os dados vêm da restauração da demo, e os horários são escolhidos pelo que a página mostra (D103).
+- **Repetições:** nenhuma localmente. No CI, uma, com `failOnFlakyTests`: o teste que só passa na repetição falha o job. Trace e vídeo de toda tentativa que falha, e captura de tela na falha (D104).
+- **Tempo:** cerca de 75 s localmente, com as imagens em cache: uns 35 s para o build de produção e a subida, 8 s para o banco e a demo e 25 s para os 10 testes.
 
 ## Uso dos MCPs (D58)
 
