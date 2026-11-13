@@ -51,7 +51,8 @@ describe('login (UC02)', () => {
 
     await fillLogin(user, OWNER_EMAIL, TEST_PASSWORD)
 
-    // The panel group is loaded on demand (D54): the first import, under the load of the whole suite, takes longer.
+    // The first opening of the panel in this file: its group is loaded on demand (D54) and, cold and
+    // under the load of the whole suite, takes longer than the default wait of setup.ts.
     await waitFor(() => expect(where(router)).toBe('/painel'), { timeout: 10_000 })
     expect(await screen.findByText('Dona Ana')).toBeInTheDocument()
     expect(screen.getByText('Dono · Barbearia Central')).toBeInTheDocument()

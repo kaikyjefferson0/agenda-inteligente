@@ -25,7 +25,7 @@ describe('leaving the panel with changes not saved (D100)', () => {
     const { user, router } = await open()
     expect(closeTab().defaultPrevented).toBe(false)
     await user.click(menuLink('Equipe'))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Equipe' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Equipe' })).toBeInTheDocument()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/painel/equipe')
   })
@@ -47,7 +47,7 @@ describe('leaving the panel with changes not saved (D100)', () => {
 
     await user.click(menuLink('Equipe'))
     await user.click(await screen.findByRole('button', { name: 'Descartar e sair' }))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Equipe' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Equipe' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/painel/equipe')
     // The form left behind no longer counts.
     expect(closeTab().defaultPrevented).toBe(false)
@@ -61,7 +61,7 @@ describe('leaving the panel with changes not saved (D100)', () => {
     expect(closeTab().defaultPrevented).toBe(false)
 
     await user.click(menuLink('Equipe'))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Equipe' }, { timeout: 5000 })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Equipe' })).toBeInTheDocument()
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
 
@@ -76,7 +76,7 @@ describe('leaving the panel with changes not saved (D100)', () => {
 
     await user.click(screen.getAllByRole('button', { name: 'Sair' }).at(0)!)
     await user.click(await screen.findByRole('button', { name: 'Descartar e sair' }))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/entrar'), { timeout: 5000 })
+    await waitFor(() => expect(router.state.location.pathname).toBe('/entrar'))
   })
 
   it('never holds the panel when the session ends elsewhere', async () => {
@@ -84,7 +84,7 @@ describe('leaving the panel with changes not saved (D100)', () => {
     await changeMaxAdvance(user)
     // As a refused refresh, or "Sair" in another tab (D73).
     act(() => getAppSession().end('expired'))
-    await waitFor(() => expect(router.state.location.pathname).toBe('/entrar'), { timeout: 5000 })
+    await waitFor(() => expect(router.state.location.pathname).toBe('/entrar'))
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
   })
 })

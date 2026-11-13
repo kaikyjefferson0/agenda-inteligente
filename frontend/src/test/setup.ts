@@ -1,9 +1,16 @@
 import '@testing-library/jest-dom/vitest'
 
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from 'vitest'
 
 import { server } from './msw/server'
+
+// The default wait of findBy… and waitFor. The 1 s of the Testing Library is short for the
+// first drawing of a page whose group of routes is loaded on demand (D54) while the whole suite
+// shares the machine, as in the CI: measured with coverage, such waits reached 2 s here, and
+// the CI was much slower than this machine at its peaks. Only the first opening of the panel in
+// a file waits longer, on its own.
+configure({ asyncUtilTimeout: 5_000 })
 
 // jsdom has no matchMedia; the sidebar and the color scheme use it.
 Object.defineProperty(window, 'matchMedia', {

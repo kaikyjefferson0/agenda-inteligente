@@ -475,9 +475,7 @@ describe('customer data and booking (UC11)', () => {
     expect(screen.queryByRole('button', { name: 'Tentar de novo' })).not.toBeInTheDocument()
 
     vi.setSystemTime(new Date(NOW.getTime() + 31_000))
-    expect(
-      await screen.findByRole('button', { name: 'Confirmar agendamento' }, { timeout: 2000 }),
-    ).toBeEnabled()
+    expect(await screen.findByRole('button', { name: 'Confirmar agendamento' })).toBeEnabled()
   })
 
   it('shows the link only on the screen when the e-mail limit was hit', async () => {

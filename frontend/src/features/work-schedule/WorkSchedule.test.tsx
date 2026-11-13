@@ -33,7 +33,8 @@ async function renderPage(path: string, role: Role = 'owner', heading = 'Expedie
       <RouterProvider router={router} />
     </Providers>,
   )
-  // The panel group is loaded on demand (D54): the first import, under the load of the whole suite, takes longer.
+  // The first opening of the panel in each test: its group is loaded on demand (D54) and, cold and
+  // under the load of the whole suite, takes longer than the default wait of setup.ts.
   await screen.findByRole('heading', { level: 1, name: heading }, { timeout: 10_000 })
   return { router, user, queryClient }
 }
@@ -43,7 +44,7 @@ const where = (router: Awaited<ReturnType<typeof renderPage>>['router']) =>
 
 /** One day of the week editor, by its name. */
 async function day(name: string) {
-  return within(await screen.findByRole('listitem', { name }, { timeout: 5_000 }))
+  return within(await screen.findByRole('listitem', { name }))
 }
 
 /** The summary below the name of a day, whose ranges are split in spans that never wrap. */
