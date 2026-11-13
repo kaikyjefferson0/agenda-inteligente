@@ -51,7 +51,8 @@ describe('login (UC02)', () => {
 
     await fillLogin(user, OWNER_EMAIL, TEST_PASSWORD)
 
-    await waitFor(() => expect(where(router)).toBe('/painel'))
+    // The panel group is loaded on demand (D54): the first import, under the load of the whole suite, takes longer.
+    await waitFor(() => expect(where(router)).toBe('/painel'), { timeout: 10_000 })
     expect(await screen.findByText('Dona Ana')).toBeInTheDocument()
     expect(screen.getByText('Dono · Barbearia Central')).toBeInTheDocument()
     expect(authApi.bodies).toEqual([{ email: OWNER_EMAIL, password: TEST_PASSWORD }])

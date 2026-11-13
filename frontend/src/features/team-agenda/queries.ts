@@ -2,35 +2,30 @@ import { queryOptions, useMutation, useQueryClient, type QueryClient } from '@ta
 
 import { api, unwrap } from '@/api/client'
 import type { components } from '@/api/schema'
+import { teamKeys } from '@/features/scheduling'
 
 import { weekPeriod } from './period'
+
+// The reads shared with the working hours and blocks live in `scheduling` (D66).
+export {
+  professionalsQuery,
+  servicesQuery,
+  teamKeys,
+  timeBlocksQuery,
+  workingHoursQuery,
+  type Professional,
+  type Service,
+  type TimeBlock,
+  type WorkingInterval,
+} from '@/features/scheduling'
 
 export type StaffAppointment = components['schemas']['StaffAppointmentData']
 export type StaffChange = components['schemas']['StaffChangeResponse']
 export type CreatedAppointment = components['schemas']['CreatedAppointmentResponse']
 export type CreateAppointmentBody = components['schemas']['CreateAppointmentRequest']
 export type StaffRescheduleBody = components['schemas']['StaffRescheduleRequest']
-export type Professional = components['schemas']['ProfessionalData']
-export type Service = components['schemas']['ServiceData']
-export type WorkingInterval = components['schemas']['IntervalData']
-export type TimeBlock = components['schemas']['TimeBlockData']
 export type SlotRefusal = components['schemas']['SlotRefusal']
 export type EmailStatus = StaffChange['email_status']
-
-/**
- * Reads of the team agenda (UC15 to UC18), all under `['team']`. The agenda
- * of a week is `['team', 'agenda', monday, professional | 'todos']` (D78):
- * every change invalidates `['team', 'agenda']`.
- */
-export const teamKeys = {
-  agendaAll: ['team', 'agenda'] as const,
-  agenda: (weekStart: string, professionalId: string | null) =>
-    ['team', 'agenda', weekStart, professionalId ?? 'todos'] as const,
-  professionals: ['team', 'professionals'] as const,
-  services: ['team', 'services'] as const,
-  workingHours: (professionalId: string) => ['team', 'working-hours', professionalId] as const,
-  timeBlocks: (professionalId: string) => ['team', 'time-blocks', professionalId] as const,
-}
 
 /**
  * The agenda of the week that starts on `weekStart`. Without a professional,
@@ -50,45 +45,6 @@ export function agendaQuery(weekStart: string, professionalId: string | null, ti
         }),
       )
     },
-  })
-}
-
-/** For a Professional, only the own record, with `service_ids`. */
-export const professionalsQuery = queryOptions({
-  queryKey: teamKeys.professionals,
-  queryFn: ({ signal }) => unwrap(api.GET('/api/v1/professionals', { signal })),
-  staleTime: 5 * 60_000,
-})
-
-export const servicesQuery = queryOptions({
-  queryKey: teamKeys.services,
-  queryFn: ({ signal }) => unwrap(api.GET('/api/v1/services', { signal })),
-  staleTime: 5 * 60_000,
-})
-
-export function workingHoursQuery(professionalId: string) {
-  return queryOptions({
-    queryKey: teamKeys.workingHours(professionalId),
-    queryFn: ({ signal }) =>
-      unwrap(
-        api.GET('/api/v1/professionals/{professional_id}/working-hours', {
-          params: { path: { professional_id: professionalId } },
-          signal,
-        }),
-      ),
-  })
-}
-
-export function timeBlocksQuery(professionalId: string) {
-  return queryOptions({
-    queryKey: teamKeys.timeBlocks(professionalId),
-    queryFn: ({ signal }) =>
-      unwrap(
-        api.GET('/api/v1/professionals/{professional_id}/time-blocks', {
-          params: { path: { professional_id: professionalId } },
-          signal,
-        }),
-      ),
   })
 }
 

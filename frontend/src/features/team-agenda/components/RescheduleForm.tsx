@@ -5,6 +5,7 @@ import { ApiError } from '@/api/errors'
 import { ErrorMessage } from '@/components/feedback/ErrorMessage'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { SelectField } from '@/features/scheduling'
 import { toLocalDate, toUtcInstant } from '@/lib/datetime'
 
 import { isFinalRefusal, refusalMessage, slotProblemMessage, slotRefusalOf } from '../messages'
@@ -19,7 +20,6 @@ import {
 import { checkSlot } from '../slot-check'
 import { useSlotContext } from '../use-slot-context'
 import { nameOf } from '../viewer'
-import { SelectField } from './SelectField'
 import { StaffTimeField } from './StaffTimeField'
 
 export type RescheduleResult =

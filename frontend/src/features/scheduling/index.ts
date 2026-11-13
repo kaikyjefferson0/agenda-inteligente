@@ -1,10 +1,11 @@
-// Shared by the public booking (UC10, UC11), the customer link (UC12 to UC14)
-// and the team agenda (UC15 to UC18), D66.
+// Shared by the public booking (UC10, UC11), the customer link (UC12 to UC14),
+// the team agenda (UC15 to UC18) and the working hours and blocks (UC08, UC09), D66.
 export { ChoiceList, type Choice } from './components/ChoiceList'
 export { ContinueButton } from './components/ContinueButton'
 export { CopyLinkButton } from './components/CopyLinkButton'
 export { DateTimePicker, type Slot } from './components/DateTimePicker'
 export { DayStrip, type DayStripHandle } from './components/DayStrip'
+export { SelectField, type SelectOption } from './components/SelectField'
 export { StatusBadge } from './components/StatusBadge'
 export {
   CUSTOMER_MESSAGES,
@@ -31,3 +32,15 @@ export {
   type PublicProfessional,
   type PublicService,
 } from './queries'
+export {
+  ownProfessional,
+  professionalsQuery,
+  servicesQuery,
+  teamKeys,
+  timeBlocksQuery,
+  workingHoursQuery,
+  type Professional,
+  type Service,
+  type TimeBlock,
+  type WorkingInterval,
+} from './staff-queries'

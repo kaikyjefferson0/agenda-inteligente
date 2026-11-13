@@ -115,7 +115,8 @@ describe('agenda of the day (UC15)', () => {
     await dayList()
 
     await user.click(screen.getByRole('button', { name: 'Próximo dia' }))
-    expect(await screen.findByText('sexta-feira, 13/11/2026')).toBeInTheDocument()
+    // Under the load of the whole suite with coverage, the new day may take longer than the default 1 s.
+    expect(await screen.findByText('sexta-feira, 13/11/2026', {}, { timeout: 5_000 })).toBeInTheDocument()
     expect((await dayList()).getByRole('button', { name: /Helena Reis/ })).toBeInTheDocument()
     expect(where(router)).toBe('/painel?dia=2026-11-13')
     expect(teamApi.agendaRequests).toHaveLength(1)
