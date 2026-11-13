@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/features/scheduling'
 import { formatDateTime } from '@/lib/datetime'
+import { timeZoneName } from '@/lib/timezone-name'
 
 import type { Outcome } from '../outcome'
 import { appointmentKeys, type CustomerAppointment } from '../queries'
@@ -76,7 +77,7 @@ export function AppointmentView({ token, appointment }: AppointmentViewProps) {
           {/* While rescheduling, the picker below already says it. */}
           {rescheduling ? null : (
             <p className="text-sm text-muted-foreground">
-              Horários no fuso do negócio ({business.timezone.replaceAll('_', ' ')}).
+              Horários no fuso do negócio ({timeZoneName(business.timezone)}).
             </p>
           )}
         </section>
@@ -123,8 +124,8 @@ export function AppointmentView({ token, appointment }: AppointmentViewProps) {
             </div>
           </section>
         ) : confirmed ? (
-          // A standing fact of the page, not news: a note, not an alert.
-          <Alert role="note">
+          // Information, not an error: status, never alert.
+          <Alert role="status">
             <ClockAlertIcon aria-hidden="true" />
             <AlertTitle>O prazo para alterar pelo link terminou</AlertTitle>
             <AlertDescription>
@@ -204,27 +205,30 @@ function OutcomeNotice({ outcome, businessName }: { outcome: Outcome; businessNa
 
   const { title: heading, icon: Icon } = NOTICES[outcome.kind]
   const change = outcome.kind === 'cancelled' ? 'O cancelamento' : 'A remarcação'
+  // The end of a public flow, as the booking (D59): a 48 px mark, the title and the details.
   return (
-    <Alert className="border-success/40 bg-success-soft text-success-soft-foreground">
-      <Icon aria-hidden="true" />
-      <AlertTitle ref={title} tabIndex={-1}>
-        {heading}
-      </AlertTitle>
-      <AlertDescription className="text-success-soft-foreground">
-        {outcome.emailStatus === 'queued' ? (
-          <p>
-            Enviamos a confirmação para o seu <span className="whitespace-nowrap">e-mail</span>.
-          </p>
-        ) : (
-          <p>
-            {change} já vale em {businessName}, mas não conseguimos enviar o{' '}
-            <span className="whitespace-nowrap">e-mail</span> de confirmação agora.
-          </p>
-        )}
-        {outcome.kind === 'rescheduled' ? (
-          <p>Este link continua valendo para o novo horário.</p>
-        ) : null}
-      </AlertDescription>
-    </Alert>
+    <div role="status" className="flex items-start gap-4">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-success-soft text-success-soft-foreground">
+        <Icon aria-hidden="true" className="size-6" strokeWidth={2.5} />
+      </span>
+      <div className="flex flex-col gap-1.5">
+        <div ref={title} tabIndex={-1} className="font-heading text-2xl leading-tight font-semibold tracking-tight">
+          {heading}
+        </div>
+        <div className="flex flex-col gap-1 text-muted-foreground">
+          {outcome.emailStatus === 'queued' ? (
+            <p>
+              Enviamos a confirmação para o seu <span className="whitespace-nowrap">e-mail</span>.
+            </p>
+          ) : (
+            <p>
+              {change} já vale em {businessName}, mas não conseguimos enviar o{' '}
+              <span className="whitespace-nowrap">e-mail</span> de confirmação agora.
+            </p>
+          )}
+          {outcome.kind === 'rescheduled' ? <p>Este link continua valendo para o novo horário.</p> : null}
+        </div>
+      </div>
+    </div>
   )
 }

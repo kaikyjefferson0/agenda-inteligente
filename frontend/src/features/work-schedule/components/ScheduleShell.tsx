@@ -2,20 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { UsersIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 
+import { DiscardChangesDialog } from '@/components/feedback/DiscardChangesDialog'
 import { ErrorMessage } from '@/components/feedback/ErrorMessage'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { SelectField, servicesQuery, type Professional } from '@/features/scheduling'
+import { timeZoneName } from '@/lib/timezone-name'
 
 import { useScheduleProfessional, type ScheduleAccount } from '../use-schedule-professional'
 
@@ -115,38 +107,22 @@ export function ScheduleShell({ title, description, account, dirty = false, chil
           {title}
         </h1>
         <p className="max-w-prose text-[0.9375rem] text-pretty text-muted-foreground">
-          {description} Horários no fuso do negócio, {account.timeZone.replaceAll('_', ' ')}.
+          {description} Horários no fuso do negócio ({timeZoneName(account.timeZone)}).
         </p>
       </header>
       {body}
 
-      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent className="gap-5 p-5 data-[size=default]:max-w-[calc(100%-2rem)] data-[size=default]:sm:max-w-md">
-          <AlertDialogHeader className="gap-2">
-            <AlertDialogTitle className="text-xl font-semibold">Descartar as alterações?</AlertDialogTitle>
-            <AlertDialogDescription className="text-[0.9375rem] text-pretty">
-              O expediente de {selected?.name} tem alterações que não foram salvas. Ao abrir o de{' '}
-              {pendingName}, elas se perdem.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="-mx-5 -mb-5 p-5">
-            <AlertDialogCancel size="lg" className="h-11! px-5! text-base!">
-              Continuar editando
-            </AlertDialogCancel>
-            <AlertDialogAction
-              size="lg"
-              variant="outline"
-              className="h-11! px-5! text-base!"
-              onClick={() => {
-                if (pending !== null) select(pending)
-                setPending(null)
-              }}
-            >
-              Descartar e trocar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DiscardChangesDialog
+        open={pending !== null}
+        title="Descartar as alterações?"
+        description={`O expediente de ${selected?.name ?? ''} tem alterações que não foram salvas. Ao abrir o de ${pendingName ?? ''}, elas se perdem.`}
+        confirmLabel="Descartar e trocar"
+        onCancel={() => setPending(null)}
+        onConfirm={() => {
+          if (pending !== null) select(pending)
+          setPending(null)
+        }}
+      />
     </section>
   )
 }

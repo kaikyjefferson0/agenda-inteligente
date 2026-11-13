@@ -40,9 +40,9 @@ export const configApi = {
   team: null as Professional[] | null,
   /** What the next `PATCH /business` answers in `appointments_outside_hours`. */
   outside: [] as Scheduled[],
-  refuse: {} as Partial<Record<'business' | 'createService' | 'updateService' | 'invite' | 'serve' | 'deactivate' | 'setServices', Refusal>>,
+  refuse: {} as Partial<Record<'business' | 'createService' | 'updateService' | 'invite' | 'serve' | 'deactivate' | 'setServices' | 'cancelInvite', Refusal>>,
   bodies: { business: [] as unknown[], services: [] as unknown[], invites: [] as unknown[], setServices: [] as unknown[] },
-  calls: { patchBusiness: 0, createService: 0, updateService: 0, invite: 0, serve: 0, deactivate: 0, setServices: 0 },
+  calls: { patchBusiness: 0, createService: 0, updateService: 0, invite: 0, serve: 0, deactivate: 0, setServices: 0, cancelInvite: 0 },
   nextId: 1,
 
   reset() {
@@ -177,6 +177,16 @@ export const configHandlers = [
     if (member === undefined) return problem(404, 'NOT_FOUND')
     member.is_bookable = false
     if (member.user_id !== ME.user.id) member.is_active = false
+    return new HttpResponse(null, { status: 204 })
+  }),
+  http.delete(`${API}/professionals/:id/invitation`, ({ params }) => {
+    configApi.calls.cancelInvite += 1
+    const refusal = refused('cancelInvite')
+    if (refusal !== null) return refusal
+    const member = configApi.members().find((item) => item.id === params.id)
+    if (member === undefined) return problem(404, 'NOT_FOUND')
+    if (!member.invitation_pending) return problem(409, 'INVITATION_NOT_PENDING')
+    configApi.team = configApi.members().filter((item) => item.id !== params.id)
     return new HttpResponse(null, { status: 204 })
   }),
   http.put(`${API}/professionals/:id/services`, async ({ params, request }) => {

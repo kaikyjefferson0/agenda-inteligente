@@ -15,7 +15,7 @@ export function BusinessNotFound() {
     <Empty className="mx-auto max-w-md px-4 py-16">
       <title>Negócio não encontrado | Agenda Inteligente</title>
       <EmptyHeader>
-        <EmptyTitle className="text-2xl font-semibold">
+        <EmptyTitle className="text-[2rem] leading-[1.1] font-semibold text-balance sm:text-[2.375rem]">
           <h1>Não encontramos este negócio</h1>
         </EmptyTitle>
         <EmptyDescription>

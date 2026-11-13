@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { NotFoundContent } from '@/pages/NotFoundPage'
 
 import { ErrorMessage } from './ErrorMessage'
+import { OfflineNotice } from './OfflineNotice'
 
 /**
  * `errorElement` of each group of routes (D54). It replaces only the group, so
@@ -18,19 +19,22 @@ export function RouteError() {
   }
 
   return (
-    <main
-      id="conteudo"
-      className="mx-auto flex min-h-svh w-full max-w-lg flex-col justify-center gap-4 px-4 py-10"
-    >
-      <title>Erro | Agenda Inteligente</title>
+    <>
+      <OfflineNotice />
+      <main
+        id="conteudo"
+        className="mx-auto flex min-h-svh w-full max-w-lg flex-col justify-center gap-4 px-4 py-10"
+      >
+        <title>Erro | Agenda Inteligente</title>
       <ErrorMessage
         error={error}
         title="Esta página não pôde ser exibida"
         onRetry={() => window.location.reload()}
       />
-      <Button asChild variant="link" className="self-start px-0">
-        <Link to="/">Voltar ao início</Link>
-      </Button>
-    </main>
+        <Button asChild variant="link" className="self-start px-0">
+          <Link to="/">Voltar ao início</Link>
+        </Button>
+      </main>
+    </>
   )
 }

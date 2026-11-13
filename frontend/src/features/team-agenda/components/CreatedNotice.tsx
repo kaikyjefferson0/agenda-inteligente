@@ -72,7 +72,7 @@ export function CreatedNotice({ created, professional, timeZone, onAnother, onSh
               readOnly
               value={created.access_url}
               onFocus={(event) => event.currentTarget.select()}
-              className="h-11 min-w-0 flex-1 font-mono text-sm"
+              className="h-11 min-w-0 font-mono text-sm sm:flex-1"
             />
             <CopyLinkButton value={created.access_url} fieldRef={field} />
           </div>

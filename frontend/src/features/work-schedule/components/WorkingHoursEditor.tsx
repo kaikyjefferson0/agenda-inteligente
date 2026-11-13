@@ -13,6 +13,7 @@ import {
   type Professional,
   type WorkingInterval,
 } from '@/features/scheduling'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 import { useSaveWorkingHours, type WorkingHoursUpdate } from '../queries'
 import {
@@ -86,6 +87,7 @@ function WeekForm({ professional, timeZone, isOwner, onDirtyChange, saved }: Wee
   const notice = useRef<HTMLDivElement>(null)
 
   const dirty = !sameWeek(draft, draftOf(saved))
+  useUnsavedChanges(dirty)
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
   useEffect(() => () => onDirtyChange(false), [onDirtyChange])
   useEffect(() => {
@@ -132,7 +134,7 @@ function WeekForm({ professional, timeZone, isOwner, onDirtyChange, saved }: Wee
       {result !== null ? (
         outside.length > 0 ? (
           <div ref={notice} tabIndex={-1} className="flex flex-col gap-3">
-            <Alert>
+            <Alert role="status">
               <CalendarClockIcon aria-hidden="true" />
               <AlertTitle>
                 Expediente salvo. {plural(outside.length, 'agendamento ficou', 'agendamentos ficaram')} fora dele

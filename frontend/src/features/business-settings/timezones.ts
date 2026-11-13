@@ -5,25 +5,7 @@
  * refuses comes back as a `422` on the field.
  */
 
-/** The IANA zones of Brazil, first in the list, with the names as Brazilians write them. */
-const BRAZIL: Record<string, string> = {
-  'America/Sao_Paulo': 'São Paulo e Brasília',
-  'America/Bahia': 'Bahia',
-  'America/Fortaleza': 'Fortaleza',
-  'America/Recife': 'Recife',
-  'America/Maceio': 'Maceió',
-  'America/Belem': 'Belém',
-  'America/Araguaina': 'Araguaína',
-  'America/Santarem': 'Santarém',
-  'America/Noronha': 'Fernando de Noronha',
-  'America/Manaus': 'Manaus',
-  'America/Boa_Vista': 'Boa Vista',
-  'America/Porto_Velho': 'Porto Velho',
-  'America/Campo_Grande': 'Campo Grande',
-  'America/Cuiaba': 'Cuiabá',
-  'America/Rio_Branco': 'Rio Branco',
-  'America/Eirunepe': 'Eirunepé',
-}
+import { BRAZIL_ZONES, timeZoneName } from '@/lib/timezone-name'
 
 const REGIONS: Record<string, string> = {
   America: 'Américas',
@@ -60,17 +42,9 @@ export function offsetOf(timeZone: string, now: Date): string {
   }
 }
 
-/** `Buenos Aires (Argentina)` from `America/Argentina/Buenos_Aires`. */
-function placeOf(timeZone: string): string {
-  const parts = timeZone.split('/').map((part) => part.replaceAll('_', ' '))
-  if (parts.length <= 1) return parts[0]
-  const city = parts.at(-1)!
-  return parts.length > 2 ? `${city} (${parts.slice(1, -1).join(', ')})` : city
-}
-
 export function zoneLabel(timeZone: string, now: Date): string {
   const offset = offsetOf(timeZone, now)
-  const place = BRAZIL[timeZone] ?? placeOf(timeZone)
+  const place = timeZoneName(timeZone)
   return offset === '' ? place : `${place} · ${offset}`
 }
 
@@ -90,7 +64,7 @@ export function zoneGroups(current: string, now: Date, available: string[] = sup
   const regions = new Map<string, ZoneOption[]>()
   for (const zone of all) {
     const option = { value: zone, label: zoneLabel(zone, now) }
-    if (zone in BRAZIL) {
+    if (zone in BRAZIL_ZONES) {
       brazil.push(option)
       continue
     }
@@ -98,7 +72,7 @@ export function zoneGroups(current: string, now: Date, available: string[] = sup
     regions.set(region, [...(regions.get(region) ?? []), option])
   }
   const byLabel = (a: ZoneOption, b: ZoneOption) => a.label.localeCompare(b.label, 'pt-BR')
-  const brazilOrder = Object.keys(BRAZIL)
+  const brazilOrder = Object.keys(BRAZIL_ZONES)
   brazil.sort((a, b) => brazilOrder.indexOf(a.value) - brazilOrder.indexOf(b.value))
   const rest = [...regions.entries()]
     .sort(([a], [b]) => (a === 'Outros' ? 1 : b === 'Outros' ? -1 : a.localeCompare(b, 'pt-BR')))

@@ -9,6 +9,7 @@ import {
   MailIcon,
   UserCheckIcon,
   UserPlusIcon,
+  UsersIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
@@ -20,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import {
@@ -35,6 +37,7 @@ import { formatDateTime } from '@/lib/datetime'
 
 import { useInvite, useStartServing } from '../queries'
 import { situationOf, SITUATION_LABELS, teamOrder, type Situation } from '../situation'
+import { CancelInvitationDialog, type CancelInvitationResult } from './CancelInvitationDialog'
 import { DeactivateDialog, type DeactivateResult } from './DeactivateDialog'
 import { InviteForm } from './InviteForm'
 import { MemberServices } from './MemberServices'
@@ -50,6 +53,7 @@ export interface TeamAccount {
 type Notice =
   | { kind: 'success'; text: ReactNode }
   | { kind: 'error'; title: string; error: unknown }
+  | { kind: 'info'; title: string; text: string }
   | { kind: 'conflicts'; professional: Professional; isOwner: boolean; appointments: ScheduledAppointment[] }
 
 const SITUATION_ICONS: Record<Situation, typeof CheckIcon> = {
@@ -160,6 +164,23 @@ export function TeamManager({ account }: { account: TeamAccount }) {
     }
   }
 
+  const cancelled = (member: Professional, result: CancelInvitationResult) => {
+    if (result.kind === 'done') {
+      setNotice({
+        kind: 'success',
+        text: `Convite de ${member.name} cancelado. O link deixou de valer, e ${member.email} pode ser convidado de novo.`,
+      })
+    } else if (result.kind === 'not-pending') {
+      setNotice({
+        kind: 'info',
+        title: `O convite de ${member.name} não está mais pendente`,
+        text: 'A pessoa já aceitou o convite ou a conta foi desativada. A lista foi atualizada.',
+      })
+    } else {
+      setNotice({ kind: 'error', title: `${member.name} não está mais na equipe`, error: null })
+    }
+  }
+
   const row = (member: Professional) => {
     const situation = situationOf(member, account.userId)
     const isOwner = member.user_id === account.userId
@@ -194,7 +215,7 @@ export function TeamManager({ account }: { account: TeamAccount }) {
             )}
             {situation === 'pending' ? (
               <p className="text-sm text-pretty text-muted-foreground">
-                Entra nas reservas quando aceitar o convite. Se o link venceu, reenvie.
+                {invitationValidity(member.invitation_expires_at, account.timeZone)}
               </p>
             ) : null}
           </div>
@@ -229,6 +250,9 @@ export function TeamManager({ account }: { account: TeamAccount }) {
                   {renewing === member.id ? <Spinner aria-hidden="true" /> : <MailIcon aria-hidden="true" />}
                   {retry.waiting ? retry.label : 'Reenviar convite'}
                 </Button>
+              ) : null}
+              {situation === 'pending' && !account.isDemo ? (
+                <CancelInvitationDialog professional={member} onSettled={(result) => cancelled(member, result)} />
               ) : null}
               {situation === 'active' || situation === 'owner-serving' ? (
                 <DeactivateDialog
@@ -278,7 +302,7 @@ export function TeamManager({ account }: { account: TeamAccount }) {
             className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="flex flex-col gap-1">
-              <h2 id="equipe-dono" className="text-base font-semibold">
+              <h2 id="equipe-dono" className="text-lg font-semibold">
                 Você não atende clientes
               </h2>
               <p className="text-[0.9375rem] text-pretty text-muted-foreground">
@@ -301,9 +325,15 @@ export function TeamManager({ account }: { account: TeamAccount }) {
             />
           ) : null}
           {current.length === 0 ? (
-            <p className="rounded-xl border bg-card p-4 text-[0.9375rem] text-muted-foreground">
-              Ninguém na equipe ainda. Convide o primeiro profissional abaixo.
-            </p>
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <UsersIcon aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>Ninguém na equipe ainda</EmptyTitle>
+                <EmptyDescription>Convide o primeiro profissional abaixo, ou passe a atender com “Também atendo”.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <ul className="flex flex-col divide-y overflow-hidden rounded-xl border bg-card">{current.map(row)}</ul>
           )}
@@ -327,8 +357,8 @@ export function TeamManager({ account }: { account: TeamAccount }) {
         <section className="rounded-xl border bg-card p-4">
           {account.isDemo ? (
             <div className="flex flex-col gap-3">
-              <h2 className="text-xl leading-tight font-semibold sm:text-2xl">Convidar profissional</h2>
-              <Alert>
+              <h2 className="text-lg font-semibold">Convidar profissional</h2>
+              <Alert role="status">
                 <InfoIcon aria-hidden="true" />
                 <AlertTitle>Convites desligados na demonstração</AlertTitle>
                 <AlertDescription>
@@ -360,6 +390,18 @@ export function TeamManager({ account }: { account: TeamAccount }) {
   )
 }
 
+/**
+ * D98: until when the pending link is valid, in the time zone of the business
+ * (D56). Past the date the invite is still pending (D95) and can be renewed.
+ */
+function invitationValidity(expiresAt: string | null, timeZone: string): string {
+  if (expiresAt === null) return 'Entra nas reservas quando aceitar o convite.'
+  const when = formatDateTime(expiresAt, timeZone)
+  return Date.parse(expiresAt) <= Date.now()
+    ? `O convite venceu em ${when}. Reenvie para mandar um novo link.`
+    : `Entra nas reservas quando aceitar o convite, que expira em ${when}.`
+}
+
 function ServeButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
   return (
     <Button
@@ -386,10 +428,19 @@ function NoticeView({ notice, timeZone }: { notice: Notice; timeZone: string }) 
       </div>
     )
   }
+  if (notice.kind === 'info') {
+    return (
+      <Alert role="status">
+        <InfoIcon aria-hidden="true" />
+        <AlertTitle>{notice.title}</AlertTitle>
+        <AlertDescription>{notice.text}</AlertDescription>
+      </Alert>
+    )
+  }
   if (notice.kind === 'error') {
     if (notice.error === null) {
       return (
-        <Alert>
+        <Alert role="status">
           <InfoIcon aria-hidden="true" />
           <AlertTitle>{notice.title}</AlertTitle>
           <AlertDescription>A lista foi atualizada.</AlertDescription>

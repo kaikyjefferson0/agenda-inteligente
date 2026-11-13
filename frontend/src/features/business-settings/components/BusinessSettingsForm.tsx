@@ -24,6 +24,7 @@ import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from '@/compon
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Spinner } from '@/components/ui/spinner'
 import { AppointmentLinks, CopyLinkButton } from '@/features/scheduling'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 import { UNIT_LABELS, type TimeUnit } from '../durations'
 import { useUpdateBusiness } from '../queries'
@@ -82,6 +83,7 @@ export function BusinessSettingsForm({ saved, onSaved }: BusinessSettingsFormPro
     document.getElementById(field === 'step' ? `negocio-step-${draft.step}` : `negocio-${field}`)?.focus()
 
   const dirty = !sameDraft(draft, draftOf(saved))
+  useUnsavedChanges(dirty)
   useEffect(() => {
     if (result !== null) notice.current?.focus()
   }, [result])
@@ -190,8 +192,11 @@ export function BusinessSettingsForm({ saved, onSaved }: BusinessSettingsFormPro
             onBlur={() => blur(field)}
             className="h-11 w-28 text-base tabular-nums"
           />
+          <label htmlFor={`negocio-${field}-unidade`} className="sr-only">
+            {`Unidade de ${text.toLocaleLowerCase('pt-BR')}`}
+          </label>
           <NativeSelect
-            aria-label={`Unidade de ${text.toLocaleLowerCase('pt-BR')}`}
+            id={`negocio-${field}-unidade`}
             value={draft[unitKey]}
             disabled={busy}
             onChange={(event) => edit({ [unitKey]: event.target.value as TimeUnit }, [field])}
@@ -224,7 +229,7 @@ export function BusinessSettingsForm({ saved, onSaved }: BusinessSettingsFormPro
       {result !== null ? (
         outside.length > 0 ? (
           <div ref={notice} tabIndex={-1} className="flex flex-col gap-3">
-            <Alert>
+            <Alert role="status">
               <CalendarClockIcon aria-hidden="true" />
               <AlertTitle>
                 Fuso trocado. {plural(outside.length, 'agendamento ficou', 'agendamentos ficaram')} fora do expediente
@@ -256,19 +261,22 @@ export function BusinessSettingsForm({ saved, onSaved }: BusinessSettingsFormPro
       ) : null}
 
       <section aria-labelledby="negocio-endereco-publico" className="flex flex-col gap-2 rounded-xl border bg-card p-4">
-        <h2 id="negocio-endereco-publico" className="flex items-center gap-2 text-base font-semibold">
+        <h2 id="negocio-endereco-publico" className="flex items-center gap-2 text-lg font-semibold">
           <GlobeIcon aria-hidden="true" className="size-4 text-muted-foreground" />
           Página pública
         </h2>
         <p className="text-sm text-muted-foreground">Mande este link aos clientes para eles agendarem.</p>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <label htmlFor="negocio-link-publico" className="sr-only">
+            Endereço da página pública
+          </label>
           <Input
             ref={addressRef}
             readOnly
             value={publicUrl}
-            aria-label="Endereço da página pública"
+            id="negocio-link-publico"
             onFocus={(event) => event.currentTarget.select()}
-            className="h-11 min-w-0 flex-1 text-base"
+            className="h-11 min-w-0 text-base sm:flex-1"
           />
           <CopyLinkButton value={publicUrl} fieldRef={addressRef} />
         </div>
@@ -319,7 +327,7 @@ export function BusinessSettingsForm({ saved, onSaved }: BusinessSettingsFormPro
                 aria-describedby={describedBy('slug', 'negocio-slug-dica', locked ? 'negocio-slug-trava' : undefined)}
                 onChange={(event) => edit({ slug: normalizeSlug(event.target.value) }, ['slug'])}
                 onBlur={() => blur('slug')}
-                className="text-base aria-readonly:text-muted-foreground"
+                className="h-full text-base aria-readonly:text-muted-foreground"
               />
             </InputGroup>
             {error('slug')}
@@ -422,7 +430,7 @@ export function BusinessSettingsForm({ saved, onSaved }: BusinessSettingsFormPro
                     blur('maxAdvance')
                     blur('minAdvance')
                   }}
-                  className="text-base tabular-nums"
+                  className="h-full text-base tabular-nums"
                 />
                 <InputGroupAddon align="inline-end">
                   <InputGroupText className="text-[0.9375rem]">
@@ -458,7 +466,7 @@ export function BusinessSettingsForm({ saved, onSaved }: BusinessSettingsFormPro
             ) : (
               <>
                 <SaveIcon aria-hidden="true" className="size-5" />
-                Salvar
+                Salvar configurações
               </>
             )}
           </Button>

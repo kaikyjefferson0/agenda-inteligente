@@ -16,7 +16,7 @@ type Scheduled = components['schemas']['AppointmentData']
 const NOW = new Date('2026-11-12T16:00:00Z')
 
 const open = () => renderPanel('/painel/negocio', 'owner', 'Negócio')
-const save = () => screen.getByRole('button', { name: 'Salvar' })
+const save = () => screen.getByRole('button', { name: 'Salvar configurações' })
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })

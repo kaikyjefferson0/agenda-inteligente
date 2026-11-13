@@ -17,7 +17,7 @@ export function BusinessHeader({ business }: { business: PublicBusiness }) {
         </p>
       </div>
       {business.is_demo ? (
-        <Alert role="note" className="max-w-2xl">
+        <Alert role="status" className="max-w-2xl">
           <InfoIcon aria-hidden="true" />
           <AlertTitle>Este é um negócio de demonstração</AlertTitle>
           <AlertDescription>

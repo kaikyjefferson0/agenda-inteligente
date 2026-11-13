@@ -1,4 +1,4 @@
-import { ApiError } from '@/api/errors'
+import { ApiError, problemOf } from '@/api/errors'
 import { ERROR_MESSAGES, errorMessage } from '@/api/messages'
 import { formatDuration } from '@/lib/format'
 
@@ -7,9 +7,9 @@ import { formatRanges, type Range, type SlotProblem } from './slot-check'
 
 /** The `reason` of a `409 SLOT_UNAVAILABLE` of the team routes (D77), or `null`. */
 export function slotRefusalOf(error: unknown): SlotRefusal | null | undefined {
-  if (!(error instanceof ApiError) || error.code !== 'SLOT_UNAVAILABLE') return undefined
-  const reason = error.body?.reason
-  return typeof reason === 'string' ? (reason as SlotRefusal) : null
+  const problem = problemOf(error, 'SLOT_UNAVAILABLE')
+  if (problem === null) return undefined
+  return problem.reason ?? null
 }
 
 /**

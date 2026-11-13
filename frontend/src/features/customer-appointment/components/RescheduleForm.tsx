@@ -113,7 +113,7 @@ function RescheduleChoices({
   if (options.service === null) {
     return (
       <>
-        <Alert>
+        <Alert role="status">
           <CircleAlertIcon aria-hidden="true" />
           <AlertTitle>Este serviço não está mais disponível</AlertTitle>
           <AlertDescription>

@@ -13,6 +13,8 @@ import {
 import { useEffect, useRef } from 'react'
 import { Link, Outlet, useMatch, useResolvedPath } from 'react-router'
 
+import { OfflineNotice } from '@/components/feedback/OfflineNotice'
+import { UnsavedChangesProvider } from '@/components/feedback/UnsavedChangesProvider'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import {
@@ -30,6 +32,7 @@ import {
   SidebarProvider,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { useConfirmLeave } from '@/hooks/use-unsaved-changes'
 
 import { Brand } from './Brand'
 import { SkipLink } from './SkipLink'
@@ -55,6 +58,8 @@ interface PanelLayoutProps {
   account: PanelAccount | null
   onLogout: () => void
   loggingOut?: boolean
+  /** False once the session ended: leaving for `/entrar` never asks (D100). */
+  sessionActive?: boolean
 }
 
 const AGENDA: NavItem[] = [{ to: '/painel', label: 'Agenda', icon: CalendarDaysIcon, end: true }]
@@ -156,6 +161,8 @@ function NavGroup({ label, items }: { label: string; items: NavItem[] }) {
 
 /** Name, business and role, with the logout: at the foot of the menu and of the drawer. */
 function AccountFooter({ account, onLogout, loggingOut }: PanelLayoutProps) {
+  // "Sair" ends the session before any navigation: it asks first (D100).
+  const confirmLeave = useConfirmLeave()
   return (
     <div className="flex flex-col gap-2 border-t pt-3">
       {account === null ? (
@@ -177,7 +184,7 @@ function AccountFooter({ account, onLogout, loggingOut }: PanelLayoutProps) {
             type="button"
             className="h-11 md:h-8"
             disabled={loggingOut}
-            onClick={onLogout}
+            onClick={() => confirmLeave(onLogout)}
           >
             {loggingOut ? <Spinner aria-hidden="true" /> : <LogOutIcon aria-hidden="true" />}
             <span>{loggingOut ? 'Saindo…' : 'Sair'}</span>
@@ -201,36 +208,39 @@ function AccountFooter({ account, onLogout, loggingOut }: PanelLayoutProps) {
  * pages of the Owner leave the menu of a Professional (D74); hiding them is
  * comfort, and the API is what refuses access.
  */
-export function PanelLayout({ account, onLogout, loggingOut = false }: PanelLayoutProps) {
+export function PanelLayout({ account, onLogout, loggingOut = false, sessionActive = true }: PanelLayoutProps) {
   const settings = SETTINGS.filter((item) => item.ownerOnly !== true || account?.isOwner === true)
 
   return (
-    <SidebarProvider>
-      <SkipLink />
-      <Sidebar aria-label="Menu do painel">
-        <SidebarHeader className="px-4 py-3">
-          <Brand />
-        </SidebarHeader>
-        <SidebarContent>
-          <NavGroup label="Atendimento" items={AGENDA} />
-          <NavGroup label="Configuração" items={settings} />
-        </SidebarContent>
-        <SidebarFooter>
-          <AccountFooter account={account} onLogout={onLogout} loggingOut={loggingOut} />
-        </SidebarFooter>
-      </Sidebar>
-      {/* min-w-0: a wide child, such as the agenda grid, scrolls inside itself, never the page. */}
-      <SidebarInset id="conteudo" className="min-w-0">
-        <header className="flex h-14 items-center justify-between gap-3 border-b px-4 md:hidden">
-          <MobileMenuButton />
-          <span className="truncate font-heading font-semibold tracking-tight">
-            {account?.businessName ?? 'Painel'}
-          </span>
-        </header>
-        <div className="flex flex-1 flex-col">
-          <Outlet />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <UnsavedChangesProvider enabled={sessionActive}>
+      <SidebarProvider>
+        <SkipLink />
+        <Sidebar aria-label="Menu do painel">
+          <SidebarHeader className="px-4 py-3">
+            <Brand />
+          </SidebarHeader>
+          <SidebarContent>
+            <NavGroup label="Atendimento" items={AGENDA} />
+            <NavGroup label="Configuração" items={settings} />
+          </SidebarContent>
+          <SidebarFooter>
+            <AccountFooter account={account} onLogout={onLogout} loggingOut={loggingOut} />
+          </SidebarFooter>
+        </Sidebar>
+        {/* min-w-0: a wide child, such as the agenda grid, scrolls inside itself, never the page. */}
+        <SidebarInset id="conteudo" className="min-w-0">
+          <OfflineNotice />
+          <header className="flex h-14 items-center justify-between gap-3 border-b px-4 md:hidden">
+            <MobileMenuButton />
+            <span className="truncate font-heading font-semibold tracking-tight">
+              {account?.businessName ?? 'Painel'}
+            </span>
+          </header>
+          <div className="flex flex-1 flex-col">
+            <Outlet />
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </UnsavedChangesProvider>
   )
 }

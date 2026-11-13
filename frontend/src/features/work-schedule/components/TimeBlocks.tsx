@@ -116,7 +116,7 @@ function BlocksOf({ professional, account }: { professional: Professional; accou
       />
 
       <section aria-labelledby="proximos-bloqueios" className="flex flex-col gap-3">
-        <h2 id="proximos-bloqueios" className="text-xl leading-tight font-semibold sm:text-2xl">
+        <h2 id="proximos-bloqueios" className="text-lg font-semibold">
           Próximos bloqueios
           {blocks.isSuccess && upcoming.length > 0 ? (
             <span className="font-sans text-base font-normal text-muted-foreground tabular-nums"> ({upcoming.length})</span>

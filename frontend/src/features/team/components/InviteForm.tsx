@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import type { Professional } from '@/features/scheduling'
 import type { useRetryAfter } from '@/hooks/use-retry-after'
 import { formatDateTime } from '@/lib/datetime'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 import { useInvite, type Invitation } from '../queries'
 import { inviteProblems, type InviteField } from '../situation'
@@ -38,6 +39,8 @@ export function InviteForm({ timeZone, team, retry }: InviteFormProps) {
   const [emailInUse, setEmailInUse] = useState(false)
   const [failure, setFailure] = useState<unknown>(null)
   const [sent, setSent] = useState<Sent | null>(null)
+  // Cleared after a sent invite: it stops counting.
+  useUnsavedChanges(name.trim() !== '' || email.trim() !== '')
   const invite = useInvite()
   const sending = useRef(false)
   // A second click that lands after the answer, before the redraw, still has the old name and e-mail.
@@ -141,7 +144,7 @@ export function InviteForm({ timeZone, team, retry }: InviteFormProps) {
   return (
     <form noValidate aria-labelledby="convite-titulo" onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 id="convite-titulo" className="text-xl leading-tight font-semibold sm:text-2xl">
+        <h2 id="convite-titulo" className="text-lg font-semibold">
           Convidar profissional
         </h2>
         <p className="text-[0.9375rem] text-pretty text-muted-foreground">

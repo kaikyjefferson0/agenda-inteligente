@@ -17,6 +17,7 @@ export const ERROR_MESSAGES: Record<ApiErrorCode, string> = {
     'Esta solicitação já foi enviada com outros dados. Recarregue a página e tente de novo.',
   APPOINTMENT_CONFLICTS: 'Há agendamentos em conflito. Resolva-os antes de continuar.',
   TIME_BLOCK_OVERLAP: 'Já existe um bloqueio nesse período.',
+  INVITATION_NOT_PENDING: 'Este convite não está mais pendente: a pessoa já aceitou ou a conta foi desativada.',
   EMAIL_IN_USE: 'Este e-mail já está em uso.',
   SLUG_IN_USE: 'Este endereço já está em uso.',
   VALIDATION_ERROR: 'Confira os dados informados.',

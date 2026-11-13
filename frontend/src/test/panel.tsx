@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
+import { expect } from 'vitest'
 
 import { createQueryClient } from '@/api/query-client'
 import { Providers } from '@/app/providers'
@@ -26,5 +27,7 @@ export async function renderPanel(path: string, role: 'owner' | 'professional', 
     </Providers>,
   )
   await screen.findByRole('heading', { level: 1, name: heading }, { timeout: 10_000 })
+  // The frame of the page shows its title while it reads who is in: wait for the page itself.
+  await waitFor(() => expect(document.querySelector('[aria-busy="true"]')).toBeNull(), { timeout: 10_000 })
   return { router, user, queryClient }
 }

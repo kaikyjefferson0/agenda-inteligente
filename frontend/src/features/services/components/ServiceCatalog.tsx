@@ -229,7 +229,7 @@ export function ServiceCatalog({ account }: { account: ServicesAccount }) {
       <>
         {editing === 'new' ? (
           <section aria-labelledby="servico-novo-titulo" className="flex flex-col gap-4 rounded-xl border bg-card p-4">
-            <h2 id="servico-novo-titulo" className="text-xl leading-tight font-semibold sm:text-2xl">
+            <h2 id="servico-novo-titulo" className="text-lg font-semibold">
               Novo serviço
             </h2>
             <ServiceForm isDemo={account.isDemo} onSaved={saved} onCancel={() => closeForm('new')} />
@@ -291,7 +291,7 @@ export function ServiceCatalog({ account }: { account: ServicesAccount }) {
       action={newAction}
     >
       {account.isDemo ? (
-        <Alert>
+        <Alert role="status">
           <InfoIcon aria-hidden="true" />
           <AlertTitle>Negócio de demonstração</AlertTitle>
           <AlertDescription>

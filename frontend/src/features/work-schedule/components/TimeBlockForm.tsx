@@ -18,6 +18,7 @@ import {
   type ScheduledAppointment,
   type TimeBlock,
 } from '@/features/scheduling'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 import {
   blockPeriodOf,
@@ -62,6 +63,8 @@ export function TimeBlockForm({ professionalId, timeZone, today, blocks, isOwner
     endTime: '',
   })
   const [reason, setReason] = useState('')
+  // The reason or an hour typed; the days alone, which start on today, are not work to lose.
+  useUnsavedChanges(reason.trim() !== '' || input.startTime !== '' || input.endTime !== '')
   const [problems, setProblems] = useState<Partial<Record<BlockField | 'reason', string>>>({})
   const [refusal, setRefusal] = useState<Refusal | null>(null)
   const mutation = useCreateTimeBlock(professionalId)
@@ -190,7 +193,7 @@ export function TimeBlockForm({ professionalId, timeZone, today, blocks, isOwner
       onSubmit={(event) => void submit(event)}
       className="flex flex-col gap-4 rounded-xl border bg-card p-4"
     >
-      <h2 id="novo-bloqueio-titulo" className="text-xl leading-tight font-semibold sm:text-2xl">
+      <h2 id="novo-bloqueio-titulo" className="text-lg font-semibold">
         Novo bloqueio
       </h2>
 

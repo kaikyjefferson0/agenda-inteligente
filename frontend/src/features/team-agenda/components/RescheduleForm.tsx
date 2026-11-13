@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { SelectField } from '@/features/scheduling'
 import { toLocalDate, toUtcInstant } from '@/lib/datetime'
+import { useUnsavedChanges } from '@/hooks/use-unsaved-changes'
 
 import { isFinalRefusal, refusalMessage, slotProblemMessage, slotRefusalOf } from '../messages'
 import {
@@ -62,6 +63,7 @@ export function RescheduleForm({
   const [professionalId, setProfessionalId] = useState(appointment.professional_id)
   const [day, setDay] = useState(currentDay < today ? today : currentDay)
   const [time, setTime] = useState('')
+  useUnsavedChanges(time !== '' || professionalId !== appointment.professional_id)
   const [touched, setTouched] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [refusal, setRefusal] = useState<string | null>(null)

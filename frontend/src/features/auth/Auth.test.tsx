@@ -344,8 +344,10 @@ describe('new password: reset (UC03) and invitation (UC04), RN30', () => {
     await user.type(await screen.findByLabelText('Nova senha'), 'minha senha de profissional')
     await user.click(screen.getByRole('button', { name: 'Ativar conta' }))
 
-    const done = await screen.findByRole('status')
-    expect(within(done).getByRole('heading', { level: 2, name: 'Conta ativada' })).toBeInTheDocument()
+    // The layout also has the live region of "sem conexão" (D99): the panel is the one with the title.
+    const title = await screen.findByRole('heading', { level: 2, name: 'Conta ativada' })
+    const done = title.closest('[role="status"]') as HTMLElement
+    expect(done).toBeInTheDocument()
     expect(within(done).getByRole('link', { name: 'Entrar' })).toHaveAttribute('href', '/entrar')
     expect(authApi.bodies).toEqual([{ token: VALID_TOKEN, password: 'minha senha de profissional' }])
   })
