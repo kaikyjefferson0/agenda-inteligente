@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
-import { customerFieldOf, SERVER_FIELD_MESSAGES } from '@/features/scheduling'
+import { customerFieldOf, SelectField, SERVER_FIELD_MESSAGES } from '@/features/scheduling'
 import { toUtcInstant } from '@/lib/datetime'
 import { formatDuration, formatPrice } from '@/lib/format'
 
@@ -25,7 +25,6 @@ import {
 import { checkSlot } from '../slot-check'
 import { useSlotContext } from '../use-slot-context'
 import { servicesOf } from '../viewer'
-import { SelectField } from './SelectField'
 import { StaffTimeField } from './StaffTimeField'
 
 interface AppointmentFormProps {

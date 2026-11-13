@@ -1,3 +1,5 @@
+import { ownProfessional as ownProfessionalOf } from '@/features/scheduling'
+
 import type { Professional, Service, StaffAppointment } from './queries'
 
 /**
@@ -16,7 +18,7 @@ export function ownProfessional(
   account: AgendaAccount,
   professionals: Professional[],
 ): Professional | null {
-  return professionals.find((professional) => professional.user_id === account.userId) ?? null
+  return ownProfessionalOf(account.userId, professionals)
 }
 
 /** The active services the professional does (RN07), in the order of the catalog. */

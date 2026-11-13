@@ -40,6 +40,9 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
+      // On a cold run (as in CI), the first test of each file waits for the
+      // lazy route chunks to be transformed, under coverage: 5 s is not enough.
+      testTimeout: 15_000,
       env: {
         TZ: 'Asia/Tokyo',
         VITE_API_BASE_URL: 'http://api.test',
@@ -64,6 +67,7 @@ export default defineConfig(({ mode }) => {
             lines: 80,
           },
           'src/features/team-agenda/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
+          'src/features/work-schedule/**': { statements: 80, branches: 80, functions: 80, lines: 80 },
         },
       },
     },
