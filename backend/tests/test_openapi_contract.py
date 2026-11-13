@@ -101,9 +101,14 @@ def test_success_bodies_of_200_are_declared() -> None:
     assert schema_of(booking, "post", "200") == {"$ref": f"{REF}BookingResponse"}
 
 
-def test_health_declares_its_body_and_the_503() -> None:
+def test_health_declares_only_its_body() -> None:
     assert schema_of("/health", "get", "200") == {"$ref": f"{REF}HealthResponse"}
-    assert schema_of("/health", "get", "503") == {"$ref": f"{REF}Problem"}
+    assert set(document()["paths"]["/health"]["get"]["responses"]) == {"200"}
+
+
+def test_ready_declares_its_body_and_the_503() -> None:
+    assert schema_of("/ready", "get", "200") == {"$ref": f"{REF}ReadyResponse"}
+    assert schema_of("/ready", "get", "503") == {"$ref": f"{REF}Problem"}
     problem = document()["components"]["schemas"]["Problem"]
     assert problem["properties"]["code"] == {"$ref": f"{REF}ErrorCode"}
     codes = document()["components"]["schemas"]["ErrorCode"]["enum"]

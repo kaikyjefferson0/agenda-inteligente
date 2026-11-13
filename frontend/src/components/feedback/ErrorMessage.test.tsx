@@ -21,7 +21,7 @@ describe('ErrorMessage (D53)', () => {
   })
 
   it('has a message for every code of the API', () => {
-    expect(Object.keys(ERROR_MESSAGES)).toHaveLength(22)
+    expect(Object.keys(ERROR_MESSAGES)).toHaveLength(23)
   })
 
   it('shows the generic message for an unknown code', () => {

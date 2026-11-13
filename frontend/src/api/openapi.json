@@ -8,6 +8,7 @@
     "/health": {
       "get": {
         "summary": "Health",
+        "description": "D118: only the process. The host calls it every few seconds, and a query\non each call would keep the database from ever suspending.",
         "operationId": "health_health_get",
         "responses": {
           "200": {
@@ -16,6 +17,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "summary": "Ready",
+        "description": "The process and the database, for the manual smoke test after a deploy.",
+        "operationId": "ready_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
                 }
               }
             }
@@ -124,6 +144,22 @@
         "operationId": "refresh_api_v1_auth_refresh_post",
         "parameters": [
           {
+            "name": "origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origin"
+            }
+          },
+          {
             "name": "x-requested-with",
             "in": "header",
             "required": false,
@@ -140,7 +176,7 @@
             }
           },
           {
-            "name": "refresh_token",
+            "name": "__Host-refresh_token",
             "in": "cookie",
             "required": false,
             "schema": {
@@ -152,7 +188,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Refresh Token"
+              "title": "  Host-Refresh Token"
             }
           }
         ],
@@ -189,6 +225,22 @@
         "operationId": "logout_api_v1_auth_logout_post",
         "parameters": [
           {
+            "name": "origin",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origin"
+            }
+          },
+          {
             "name": "x-requested-with",
             "in": "header",
             "required": false,
@@ -205,7 +257,7 @@
             }
           },
           {
-            "name": "refresh_token",
+            "name": "__Host-refresh_token",
             "in": "cookie",
             "required": false,
             "schema": {
@@ -217,7 +269,7 @@
                   "type": "null"
                 }
               ],
-              "title": "Refresh Token"
+              "title": "  Host-Refresh Token"
             }
           }
         ],
@@ -2628,6 +2680,7 @@
           "NOT_AUTHENTICATED",
           "INVALID_REFRESH_TOKEN",
           "FORBIDDEN",
+          "ORIGIN_NOT_ALLOWED",
           "REGISTRATION_DISABLED",
           "DEMO_RESTRICTED",
           "NOT_FOUND",
@@ -2704,17 +2757,11 @@
             "type": "string",
             "const": "ok",
             "title": "Status"
-          },
-          "database": {
-            "type": "string",
-            "const": "ok",
-            "title": "Database"
           }
         },
         "type": "object",
         "required": [
-          "status",
-          "database"
+          "status"
         ],
         "title": "HealthResponse"
       },
@@ -3140,6 +3187,26 @@
           "professional_ids"
         ],
         "title": "PublicServiceData"
+      },
+      "ReadyResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "const": "ok",
+            "title": "Database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database"
+        ],
+        "title": "ReadyResponse"
       },
       "RegisterRequest": {
         "properties": {

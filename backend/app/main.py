@@ -11,6 +11,7 @@ from app.api.health import router as health_router
 from app.api.openapi import AgendaApi
 from app.api.professionals import router as professionals_router
 from app.api.public import router as public_router
+from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.time_blocks import router as time_blocks_router
 from app.core.config import get_settings
 from app.core.log_filters import install_customer_token_filter
@@ -38,6 +39,8 @@ app.add_middleware(
     ],
     expose_headers=["Retry-After"],
 )
+# Added last, so it is the outermost: CORS preflights get the headers as well.
+app.add_middleware(SecurityHeadersMiddleware)
 register_error_handlers(app)
 app.include_router(health_router)
 app.include_router(auth_router, prefix=API_PREFIX)

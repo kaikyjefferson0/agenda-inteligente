@@ -64,6 +64,20 @@ def require_csrf_header(
         raise AppError(ErrorCode.FORBIDDEN)
 
 
+def require_allowed_origin(
+    settings: SettingsDep,
+    origin: Annotated[str | None, Header()] = None,
+) -> None:
+    """D110: the routes with the cookie only accept the origins of CORS.
+
+    Sibling subdomains count as the same site for SameSite, so the cookie alone
+    does not tell the frontend apart from another page of the same domain.
+    Browsers always send Origin on a POST, so a request without it is refused.
+    """
+    if origin is None or origin.strip() not in settings.cors_origins:
+        raise AppError(ErrorCode.ORIGIN_NOT_ALLOWED)
+
+
 @dataclass(frozen=True)
 class CurrentSession:
     user: User

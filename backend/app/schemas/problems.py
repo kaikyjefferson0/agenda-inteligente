@@ -69,4 +69,8 @@ class ValidationProblem(ResponseModel):
 
 class HealthResponse(ResponseModel):
     status: Literal["ok"]
+
+
+class ReadyResponse(ResponseModel):
+    status: Literal["ok"]
     database: Literal["ok"]

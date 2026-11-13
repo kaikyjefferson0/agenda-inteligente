@@ -34,7 +34,8 @@ A API não sobe se `JWT_SECRET` ou `RATE_LIMIT_KEY_SECRET` tiverem menos de 32 c
 | Frontend | <http://localhost:5174> |
 | API | <http://localhost:8002> |
 | Documentação da API | <http://localhost:8002/docs> |
-| Verificação da API e do banco | <http://localhost:8002/health> |
+| Verificação da API | <http://localhost:8002/health> |
+| Verificação da API e do banco | <http://localhost:8002/ready> |
 | PostgreSQL | `localhost:5433` |
 | E-mails enviados (Mailpit) | <http://localhost:8025> |
 
