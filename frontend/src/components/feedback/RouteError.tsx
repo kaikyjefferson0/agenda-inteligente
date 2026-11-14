@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { NotFoundContent } from '@/pages/NotFoundPage'
 
 import { ErrorMessage } from './ErrorMessage'
-import { OfflineNotice } from './OfflineNotice'
+import { ConnectionNotice } from './ConnectionNotice'
 
 /**
  * `errorElement` of each group of routes (D54). It replaces only the group, so
@@ -20,7 +20,7 @@ export function RouteError() {
 
   return (
     <>
-      <OfflineNotice />
+      <ConnectionNotice />
       <main
         id="conteudo"
         className="mx-auto flex min-h-svh w-full max-w-lg flex-col justify-center gap-4 px-4 py-10"

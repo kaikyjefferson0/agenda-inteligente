@@ -13,7 +13,7 @@ frontend/src/
 ├── components/
 │   ├── ui/       # Componentes do shadcn, instalados com npx shadcn add (D58)
 │   ├── layout/   # PublicLayout, PanelLayout, PanelPage (moldura das páginas de configuração), PanelPageState (carregando e erro na mesma moldura, D101), marca e link de pular
-│   ├── feedback/ # ErrorMessage, PageLoader, RouteError, OfflineNotice (D99), UnsavedChangesProvider e DiscardChangesDialog (D100)
+│   ├── feedback/ # ErrorMessage, PageLoader, RouteError, ConnectionNotice (D99, D112), UnsavedChangesProvider e DiscardChangesDialog (D100)
 │   └── marketing/# Seção principal da página inicial (Magic, D58)
 ├── features/
 │   ├── scheduling/          # Compartilhado (D66): negócio, disponibilidade, dia e horário, selo, link, regras do cliente, consultas da equipe (D88) e lista de agendamentos com conflictsOf (D89)
@@ -25,7 +25,7 @@ frontend/src/
 │   ├── services/            # Serviços (UC06, D90)
 │   ├── team/                # Equipe: convite, "Também atendo", desativação e serviços de cada um (UC04 e UC07, D91)
 │   └── business-settings/   # Negócio: nome, endereço, fuso e regras de reserva (UC05, D92)
-├── hooks/        # Hooks compartilhados: use-mobile do sidebar, use-retry-after (D76), use-online (D99) e use-unsaved-changes (D100)
+├── hooks/        # Hooks compartilhados: use-mobile do sidebar, use-retry-after (D76), use-online (D99), use-connecting-to-server (D112) e use-unsaved-changes (D100)
 ├── lib/          # Funções puras: datas e fusos, nome do fuso em português (D101), esquema de cores, prévia da demo e utilitários
 ├── pages/        # Páginas por grupo de rotas: public/, account/, panel/ e a 404
 └── test/         # Configuração do Vitest e servidor do MSW com os handlers
@@ -79,7 +79,9 @@ O CI confere os dois arquivos: `export_openapi --check` no job do backend e `api
 Os caminhos do OpenAPI já começam com `/api/v1`, então a base do cliente é só a origem: `import.meta.env.VITE_API_BASE_URL ?? ''`.
 
 - **Desenvolvimento:** a base é vazia. O Vite repassa `/api` para `VITE_API_PROXY_TARGET` (padrão `http://api:8000`, dentro do Docker; fora dele, `http://localhost:8002`), e frontend e API ficam na mesma origem. O cookie de refresh (`__Host-refresh_token`, com `SameSite=Strict` e `Path=/`) funciona sem CORS. Mesmo na mesma origem, o navegador envia `Origin` no `POST`, e a API o confere em `/auth/refresh` e `/auth/logout` (D110), então a origem do Vite precisa estar em `CORS_ALLOWED_ORIGINS`, como no `.env.example`.
-- **Produção:** `VITE_API_BASE_URL` é a origem da API, como `https://api.exemplo.com`, definida no build. Frontend e API ficam em subdomínios do mesmo domínio ([Arquitetura](08-arquitetura.md#deploy)), e o cliente envia `credentials: 'include'` para o cookie acompanhar as chamadas de autenticação. A origem do frontend precisa estar em `CORS_ALLOWED_ORIGINS`.
+- **Produção:** `VITE_API_BASE_URL=https://api-agenda.kaikyjefferson.dev`, a origem da API, definida no build (D116). Frontend e API ficam em subdomínios do mesmo domínio ([Arquitetura](08-arquitetura.md#deploy)), e o cliente envia `credentials: 'include'` para o cookie acompanhar as chamadas de autenticação. A origem do frontend precisa estar em `CORS_ALLOWED_ORIGINS`.
+- **Conferência no build:** o `vite build` falha se `VITE_API_BASE_URL` não for vazia nem uma origem sem caminho e sem barra no fim, ou se a origem não estiver no `connect-src` da CSP (`frontend/csp.ts`). Um endereço errado apareceria só no navegador, depois do deploy. Vazia continua valendo: é o E2E, com a API na mesma origem pelo proxy do `vite preview`.
+- **Aquecimento (D112):** ao abrir o site, `warmUpApi()` (`src/api/warm-up.ts`, chamado no `main.tsx`) faz um `GET` a `${VITE_API_BASE_URL}/health` com `mode: 'no-cors'`, `credentials: 'omit'` e `cache: 'no-store'`, sem ler a resposta: acorda a API enquanto a página carrega, sem preflight e sem cookie. Com a base vazia, não faz nada.
 
 ### Erros e repetições
 
@@ -91,7 +93,12 @@ Toda chamada do cliente (`api`, em `src/api/client.ts`) termina de um destes jei
 
 As mensagens de `fieldErrors` vêm do Pydantic, em inglês; os formulários mostram textos próprios por campo. `ApiErrorCode` é o enum `ErrorCode` gerado (D97): um código novo da API só compila com o seu texto. Para os códigos com corpo próprio, `problemOf(error, code)` devolve o corpo com o tipo do OpenAPI (D94), sem conferência à mão. O texto para o usuário vem de `errorMessage(error)`, em `src/api/messages.ts`, que traduz cada `code` para o português, usa uma mensagem de conexão para `NetworkError`, uma de indisponibilidade para `5xx` sem código e uma genérica para o resto. No `429`, acrescenta quanto tempo esperar. O componente `ErrorMessage` mostra essa mensagem, com um botão opcional de tentar de novo.
 
-O `QueryClient` (`src/api/query-client.ts`) repete uma leitura só depois de `NetworkError` ou `5xx`, no máximo 2 vezes. Um `4xx`, inclusive o `429`, é uma resposta final. Mutações nunca são repetidas, porque podem ter chegado à API, e usam `networkMode: 'always'`: sem rede, falham na hora com a mensagem de conexão, em vez de esperar para sair sozinhas quando a rede volta (D99). As leituras também não são refeitas ao voltar para a aba e ficam válidas por 30 segundos.
+O `QueryClient` (`src/api/query-client.ts`) repete uma leitura só quando a API não respondeu de verdade:
+
+- **Partida a frio (D112):** `NetworkError` ou `5xx` sem `code` (a página da plataforma na frente da API, `isColdStartError`) se repetem com espera crescente, 1, 2, 4 e 8 s e depois a cada 15 s, 9 vezes e 90 s no total, enquanto a API grátis acorda. Depois da segunda falha seguida, a faixa "Conectando ao servidor" aparece ([Sem conexão](#sem-conexão-d99)).
+- **`5xx` da API**, com `code` (como `503 DATABASE_UNAVAILABLE`): no máximo 2 vezes, com a espera padrão do TanStack Query.
+
+Um `4xx`, inclusive o `429`, é uma resposta final. Mutações nunca são repetidas, porque podem ter chegado à API, e usam `networkMode: 'always'`: sem rede, falham na hora com a mensagem de conexão, em vez de esperar para sair sozinhas quando a rede volta (D99). As leituras também não são refeitas ao voltar para a aba e ficam válidas por 30 segundos.
 
 ### Token no cliente
 
@@ -579,11 +586,16 @@ Medido na página renderizada, com o chrome-devtools, compondo os fundos transl�
 
 ### Sem conexão (D99)
 
-- **Faixa:** `OfflineNotice` fica no topo do conteúdo do `PublicLayout` (públicas e conta), do `PanelLayout`, da 404 e do erro de rota. Presa ao topo enquanto se rola, com ícone `WifiOff` e o texto "Sem conexão. O que já carregou continua na tela; o resto volta quando a internet voltar.", em `foreground` sobre `background` invertidos. Fica dentro dos layouts, e não acima deles, porque o menu lateral fixo do painel a cobriria.
+- **Faixa:** `ConnectionNotice` fica no topo do conteúdo do `PublicLayout` (públicas e conta), do `PanelLayout`, da 404 e do erro de rota. Presa ao topo enquanto se rola, com ícone `WifiOff` e o texto "Sem conexão. O que já carregou continua na tela; o resto volta quando a internet voltar.", em `foreground` sobre `background` invertidos. Fica dentro dos layouts, e não acima deles, porque o menu lateral fixo do painel a cobriria.
 - **Leitores de tela:** a região `status` fica sempre na página, então a perda da rede é anunciada; a volta é anunciada só a eles ("Conexão restabelecida."), por alguns segundos.
 - **Leituras:** pausam e retomam com a rede (`networkMode` padrão), sem esconder os dados já carregados.
 - **Mutações:** `networkMode: 'always'`. Sem rede, falham na hora com a mensagem de conexão e o "Tentar de novo" de cada tela, e nunca saem sozinhas depois: cancelar ou agendar minutos mais tarde, sem a pessoa ver, seria pior que a falha. A reserva pública reaproveita a mesma chave no "Tentar de novo" (D64).
 - **Conferido no Chrome**, desligando a rede pelo chrome-devtools: a faixa aparece e some, "Entrar como Dono" sem rede falha na hora com a mensagem de conexão, e ao religar a rede nada é reenviado.
+
+### Conectando ao servidor (D112)
+
+- **Faixa:** a mesma `ConnectionNotice`, no mesmo lugar e na mesma região `status`, mostra "Conectando ao servidor, isso pode levar até um minuto." enquanto uma leitura se repete por uma partida a frio (`useConnectingToServer`, com `useIsFetching`). Só aparece depois da segunda falha seguida, para uma falha isolada não piscar a faixa, e some quando a leitura carrega ou desiste. Em `muted` com borda, mais discreta que a de sem conexão, porque nada está errado do lado da pessoa; ícone `LoaderCircle` girando, parado com `prefers-reduced-motion`. Sem rede, a faixa de sem conexão tem prioridade, e as leituras pausadas não contam.
+- **Conferido no Chrome** com o build de produção e a CSP, apontando o proxy para uma porta sem API: a faixa aparece em 375 px e 1280 px, no claro e no escuro, sem rolagem horizontal e sem erro de CSP no console.
 
 ### Alterações não salvas (D100)
 
@@ -655,6 +667,7 @@ npx playwright show-trace test-results/<teste>/trace.zip
 - **Sistema:** `docker-compose.e2e.yml`, projeto `agenda-e2e`. Portas no host, só em `127.0.0.1`: **5175** (build de produção do frontend, com `vite preview`) e **8003** (API, para depurar). O banco não é publicado. Não conflita com o desenvolvimento (5174, 8002, 5433), com o Mailpit (8025, 1025) nem com o Estoque Inteligente.
 - **Ordem:** `run.mjs` remove uma execução anterior, constrói as imagens e sobe o banco, roda `prepare_e2e_database` (recria `agenda_e2e`, aplica as migrações e restaura a demo; recusa qualquer banco sem `_e2e` no fim), sobe a API e o frontend com `--wait` nos healthchecks, roda o Playwright e, no fim, `down -v`. Com falha, grava os logs dos contêineres em `test-results/docker-compose.log`.
 - **Testes:** `e2e01-agendar-e-cancelar.spec.ts` e `e2e02-equipe-ve-a-agenda.spec.ts`, nos projetos `desktop` (1280 px) e `celular` (390 px), no Chromium, em `Asia/Tokyo` e `pt-BR`, com um worker só. Os dados vêm da restauração da demo, e os horários são escolhidos pelo que a página mostra (D103).
+- **CSP e console (D117):** o `vite preview` serve a mesma CSP de produção (`frontend/csp.ts`). O `test` de `e2e/support.ts` tem uma fixture automática que, em toda página do teste, junta as violações de CSP (o evento `securitypolicyviolation`), os erros do console e os erros não tratados da página, e o teste falha se houver algum.
 - **Repetições:** nenhuma localmente. No CI, uma, com `failOnFlakyTests`: o teste que só passa na repetição falha o job. Trace e vídeo de toda tentativa que falha, e captura de tela na falha (D104).
 - **Tempo:** cerca de 75 s localmente, com as imagens em cache: uns 35 s para o build de produção e a subida, 8 s para o banco e a demo e 25 s para os 10 testes.
 

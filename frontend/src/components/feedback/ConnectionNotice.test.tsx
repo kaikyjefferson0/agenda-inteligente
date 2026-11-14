@@ -1,10 +1,11 @@
-import { onlineManager } from '@tanstack/react-query'
+import { onlineManager, useQuery } from '@tanstack/react-query'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { createMemoryRouter } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { ApiError, NetworkError } from '@/api/errors'
 import { createQueryClient } from '@/api/query-client'
 import { Providers } from '@/app/providers'
 import { routes } from '@/app/router'
@@ -12,6 +13,8 @@ import { configApi } from '@/test/msw/configuration'
 import { API } from '@/test/msw/handlers'
 import { server } from '@/test/msw/server'
 import { renderPanel } from '@/test/panel'
+
+import { ConnectionNotice } from './ConnectionNotice'
 
 const goOffline = () => act(() => void window.dispatchEvent(new Event('offline')))
 const goOnline = () => act(() => void window.dispatchEvent(new Event('online')))
@@ -77,5 +80,64 @@ describe('the strip of "sem conexão" (D99)', () => {
     // Nothing waits in a queue: the network back does not send it again.
     await waitFor(() => expect(strip()).not.toBeInTheDocument())
     expect(calls).toBe(1)
+  })
+})
+
+/** A read that fails with `failures` in order and then loads. */
+function Reader({ failures }: { failures: Error[] }) {
+  const left = [...failures]
+  const query = useQuery({
+    queryKey: ['reader'],
+    queryFn: () => {
+      const failure = left.shift()
+      return failure === undefined ? Promise.resolve('carregado') : Promise.reject(failure)
+    },
+  })
+  return <p>{query.data ?? 'carregando'}</p>
+}
+
+function renderReader(failures: Error[]) {
+  render(
+    <Providers queryClient={createQueryClient({ queries: { retryDelay: 30 } })}>
+      <ConnectionNotice />
+      <Reader failures={failures} />
+    </Providers>,
+  )
+}
+
+const connecting = () => screen.queryByText('Conectando ao servidor,')
+
+describe('the strip of "conectando ao servidor" (D112)', () => {
+  it('shows while a read waits for the API to wake up, and leaves once it loads', async () => {
+    renderReader([new NetworkError(), new ApiError({ status: 502 }), new NetworkError()])
+
+    const strip = await screen.findByText('Conectando ao servidor,')
+    expect(strip.closest('[role="status"]')).toHaveTextContent('isso pode levar até um minuto')
+    expect(await screen.findByText('carregado')).toBeInTheDocument()
+    expect(connecting()).not.toBeInTheDocument()
+  })
+
+  it('does not flash for a single failure', async () => {
+    renderReader([new NetworkError()])
+
+    expect(await screen.findByText('carregado')).toBeInTheDocument()
+    expect(connecting()).not.toBeInTheDocument()
+  })
+
+  it('does not show for an error of the API itself', async () => {
+    const coded = () => new ApiError({ status: 503, code: 'DATABASE_UNAVAILABLE' })
+    renderReader([coded(), coded()])
+
+    expect(await screen.findByText('carregado')).toBeInTheDocument()
+    expect(connecting()).not.toBeInTheDocument()
+  })
+
+  it('gives way to "sem conexão" without a network', async () => {
+    renderReader([new NetworkError(), new NetworkError(), new NetworkError(), new NetworkError()])
+    await screen.findByText('Conectando ao servidor,')
+
+    goOffline()
+    expect(strip()).toBeInTheDocument()
+    expect(connecting()).not.toBeInTheDocument()
   })
 })

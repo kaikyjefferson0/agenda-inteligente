@@ -4,13 +4,21 @@ import react from '@vitejs/plugin-react'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
+import { apiBaseUrlProblem, CONTENT_SECURITY_POLICY } from './csp.ts'
+
 // D56: the tests run in a time zone far from the businesses, so any use of the
 // browser's time zone shows up. Set before Vitest starts its workers.
 process.env.TZ = 'Asia/Tokyo'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env }
+
+  // D116: a wrong address would only show up in the browser, after the deploy.
+  if (command === 'build') {
+    const problem = apiBaseUrlProblem(env.VITE_API_BASE_URL)
+    if (problem !== null) throw new Error(problem)
+  }
 
   return {
     plugins: [react(), tailwindcss()],
@@ -28,7 +36,7 @@ export default defineConfig(({ mode }) => {
         usePolling: env.VITE_USE_POLLING === 'true',
       },
       // D52: the API stays on the same origin in development, so the refresh
-      // cookie (SameSite=Strict, Path=/api/v1/auth) works without CORS.
+      // cookie (__Host-refresh_token, SameSite=Strict, Path=/) works without CORS.
       proxy: {
         '/api': {
           target: env.VITE_API_PROXY_TARGET || 'http://api:8000',
@@ -37,11 +45,14 @@ export default defineConfig(({ mode }) => {
       },
     },
     // D102: the E2E serves the production build here. The proxy is the one
-    // above (preview.proxy defaults to server.proxy).
+    // above (preview.proxy defaults to server.proxy). D117: under the CSP of
+    // production, so the E2E fails on any violation. Only here: the dev
+    // server injects inline scripts of its own.
     preview: {
       host: true,
       port: 5174,
       strictPort: true,
+      headers: { 'Content-Security-Policy': CONTENT_SECURITY_POLICY },
     },
     test: {
       environment: 'jsdom',

@@ -13,7 +13,7 @@ import {
 import { useEffect, useRef } from 'react'
 import { Link, Outlet, useMatch, useResolvedPath } from 'react-router'
 
-import { OfflineNotice } from '@/components/feedback/OfflineNotice'
+import { ConnectionNotice } from '@/components/feedback/ConnectionNotice'
 import { UnsavedChangesProvider } from '@/components/feedback/UnsavedChangesProvider'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -229,7 +229,7 @@ export function PanelLayout({ account, onLogout, loggingOut = false, sessionActi
         </Sidebar>
         {/* min-w-0: a wide child, such as the agenda grid, scrolls inside itself, never the page. */}
         <SidebarInset id="conteudo" className="min-w-0">
-          <OfflineNotice />
+          <ConnectionNotice />
           <header className="flex h-14 items-center justify-between gap-3 border-b px-4 md:hidden">
             <MobileMenuButton />
             <span className="truncate font-heading font-semibold tracking-tight">
