@@ -1,6 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
-import { DEMO, SLOT_NAME, waitForSlots } from './support.ts'
+import { DEMO, expect, SLOT_NAME, test, waitForSlots } from './support.ts'
 
 /**
  * E2E01 (UC10 to UC13): the customer books on the demo's public page, opens the

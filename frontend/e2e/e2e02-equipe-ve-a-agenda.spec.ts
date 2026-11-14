@@ -1,6 +1,6 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
-import { businessDay, DEMO } from './support.ts'
+import { businessDay, DEMO, expect, test } from './support.ts'
 
 /**
  * E2E02 (UC02, UC15): the team signs in, through the demo shortcut and through

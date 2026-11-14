@@ -54,9 +54,12 @@ let status = 0
 try {
   // Leftovers of a run with --keep would carry yesterday's demo.
   step('removendo uma execução anterior', () => compose('down', '-v', '--remove-orphans'))
-  status = step('subindo o banco e construindo as imagens', () =>
-    compose('up', '-d', '--build', '--wait', 'db'),
-  )
+  // `up --build db` would build only what db needs (nothing): the API and the
+  // frontend would come up from images of an earlier run, with old code.
+  status = step('construindo as imagens da API e do frontend', () => compose('build', 'api', 'frontend'))
+  if (status === 0) {
+    status = step('subindo o banco', () => compose('up', '-d', '--wait', 'db'))
+  }
   if (status === 0) {
     status = step('recriando o banco agenda_e2e e restaurando a demo', () =>
       compose('run', '--rm', 'api', 'python', '-m', 'app.scripts.prepare_e2e_database'),

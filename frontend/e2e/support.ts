@@ -1,4 +1,39 @@
-import { expect, type Locator, type Page } from '@playwright/test'
+import { test as base, expect, type Locator, type Page } from '@playwright/test'
+
+export { expect }
+
+/**
+ * `test` of every spec (D117): the preview serves the CSP of production, and a
+ * test fails on any violation of it (the `securitypolicyviolation` event), on
+ * any error in the console and on any uncaught error of the page, in every
+ * page of the test.
+ */
+export const test = base.extend<{ browserProblems: void }>({
+  browserProblems: [
+    async ({ context }, use) => {
+      const problems: string[] = []
+      await context.exposeBinding('__reportCspViolation', (_source, report: string) => {
+        problems.push(`violação de CSP: ${report}`)
+      })
+      await context.addInitScript(() => {
+        document.addEventListener('securitypolicyviolation', (event) => {
+          const report = (window as unknown as { __reportCspViolation: (report: string) => void })
+            .__reportCspViolation
+          report(`${event.effectiveDirective} bloqueou ${event.blockedURI || 'inline'} em ${event.sourceFile || event.documentURI}`)
+        })
+      })
+      context.on('console', (message) => {
+        if (message.type() === 'error') problems.push(`erro no console: ${message.text()} (${message.location().url})`)
+      })
+      context.on('weberror', (error) => problems.push(`erro na página: ${error.error().message}`))
+
+      await use()
+
+      expect(problems, 'o navegador registrou problemas durante o teste').toEqual([])
+    },
+    { auto: true },
+  ],
+})
 
 /** The demo of the restoration (D43, D44), with the password of docker-compose.e2e.yml. */
 export const DEMO = {

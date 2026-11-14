@@ -7,7 +7,14 @@ import { server } from '@/test/msw/server'
 
 import { createApiClient, unwrap } from './client'
 import { ApiError, NetworkError } from './errors'
-import { createQueryClient, MAX_QUERY_RETRIES, shouldRetryQuery } from './query-client'
+import {
+  COLD_START_RETRY_DELAYS_MS,
+  createQueryClient,
+  isColdStartError,
+  MAX_QUERY_RETRIES,
+  queryRetryDelay,
+  shouldRetryQuery,
+} from './query-client'
 
 const client = createApiClient({ baseUrl: 'http://api.test' })
 
@@ -44,13 +51,38 @@ async function runQuery() {
   }
 }
 
-describe('shouldRetryQuery (D53)', () => {
-  it('retries NetworkError and 5xx, at most twice', () => {
+describe('shouldRetryQuery (D53, D112)', () => {
+  it('retries a 5xx of the API at most twice', () => {
     const server500 = new ApiError({ status: 500, code: 'INTERNAL_ERROR' })
-    expect(shouldRetryQuery(0, new NetworkError())).toBe(true)
+    expect(shouldRetryQuery(0, server500)).toBe(true)
     expect(shouldRetryQuery(1, server500)).toBe(true)
     expect(shouldRetryQuery(MAX_QUERY_RETRIES, server500)).toBe(false)
-    expect(shouldRetryQuery(MAX_QUERY_RETRIES, new NetworkError())).toBe(false)
+  })
+
+  it('retries a cold start (no answer, or a 5xx without code) for about 90 s', () => {
+    const total = COLD_START_RETRY_DELAYS_MS.reduce((sum, delay) => sum + delay, 0)
+    expect(total).toBe(90_000)
+    for (const error of [new NetworkError(), new ApiError({ status: 502 })]) {
+      expect(isColdStartError(error)).toBe(true)
+      expect(shouldRetryQuery(MAX_QUERY_RETRIES, error)).toBe(true)
+      expect(shouldRetryQuery(COLD_START_RETRY_DELAYS_MS.length - 1, error)).toBe(true)
+      expect(shouldRetryQuery(COLD_START_RETRY_DELAYS_MS.length, error)).toBe(false)
+    }
+    expect(isColdStartError(new ApiError({ status: 503, code: 'DATABASE_UNAVAILABLE' }))).toBe(false)
+    expect(isColdStartError(new ApiError({ status: 404 }))).toBe(false)
+  })
+
+  it('waits longer and longer during a cold start, then every 15 s', () => {
+    const delays = COLD_START_RETRY_DELAYS_MS.map((_, index) => queryRetryDelay(index, new NetworkError()))
+    expect(delays).toEqual([1_000, 2_000, 4_000, 8_000, 15_000, 15_000, 15_000, 15_000, 15_000])
+    expect(queryRetryDelay(50, new NetworkError())).toBe(15_000)
+  })
+
+  it('keeps the default wait of TanStack Query for a 5xx of the API', () => {
+    const server503 = new ApiError({ status: 503, code: 'DATABASE_UNAVAILABLE' })
+    expect(queryRetryDelay(0, server503)).toBe(1_000)
+    expect(queryRetryDelay(1, server503)).toBe(2_000)
+    expect(queryRetryDelay(10, server503)).toBe(30_000)
   })
 
   it('never retries a 4xx, including 429, nor unknown errors', () => {
@@ -73,11 +105,24 @@ describe('QueryClient with the API', () => {
     expect(calls()).toBe(3)
   })
 
-  it('gives up after 2 retries of a NetworkError', async () => {
+  it('keeps retrying a NetworkError through the cold start, then gives up', async () => {
     const calls = sequence(() => HttpResponse.error())
 
     await expect(runQuery()).rejects.toBeInstanceOf(NetworkError)
-    expect(calls()).toBe(1 + MAX_QUERY_RETRIES)
+    expect(calls()).toBe(1 + COLD_START_RETRY_DELAYS_MS.length)
+  })
+
+  it('waits for the API to wake up behind a page of the platform', async () => {
+    const calls = sequence(
+      () => new HttpResponse('<html>Bad Gateway</html>', { status: 502, headers: { 'Content-Type': 'text/html' } }),
+      () => HttpResponse.error(),
+      () => new HttpResponse('<html>Service Unavailable</html>', { status: 503 }),
+      () => HttpResponse.error(),
+      () => HttpResponse.json(demoBusiness),
+    )
+
+    await expect(runQuery()).resolves.toEqual(demoBusiness)
+    expect(calls()).toBe(5)
   })
 
   it('does not repeat a 4xx', async () => {
