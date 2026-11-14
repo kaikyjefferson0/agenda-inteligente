@@ -99,6 +99,9 @@ jobs:
         run: npm run lint
       - name: tsc
         run: npm run typecheck
+      # D117: the CSP of the site in render.yaml must match frontend/csp.ts.
+      - name: Conferir o render.yaml
+        run: npm run check:render
       - name: Testes com cobertura (mínimo de 80% em src/lib e src/api)
         run: npm run test:coverage
       # D51: the types must be regenerated whenever openapi.json changes.
