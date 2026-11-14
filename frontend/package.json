@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "node e2e/run.mjs",
     "api:types": "openapi-typescript src/api/openapi.json -o src/api/schema.d.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:render": "node scripts/check-render.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",

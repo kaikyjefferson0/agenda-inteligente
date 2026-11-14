@@ -120,6 +120,12 @@ Os dois arquivos do contrato, `frontend/src/api/openapi.json` e `frontend/src/ap
 
 O `coverage report` usa os dados gravados pelo `pytest --cov`, então rode-o depois dele.
 
+## Deploy
+
+O site e a API rodam no Render (plano gratuito), o banco no Neon e os e-mails pelo Resend, com o site em `agenda.kaikyjefferson.dev` e a API em `api-agenda.kaikyjefferson.dev`. Os dois serviços estão descritos no [`render.yaml`](render.yaml), um Blueprint do Render sem segredos. O passo a passo, a lista das variáveis de produção e o teste de fumaça estão em [`docs/deploy.md`](docs/deploy.md).
+
+A CSP do site fica em `frontend/csp.ts` e é repetida no `render.yaml`. Depois de mudá-la, rode `npm run check:render` na pasta `frontend`, fora do container (o `render.yaml` fica na raiz). O CI faz a mesma conferência.
+
 ## Estrutura
 
 ```text
