@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "node e2e/run.mjs",
+    "test:smoke": "playwright test -c playwright.smoke.config.ts",
     "api:types": "openapi-typescript src/api/openapi.json -o src/api/schema.d.ts",
     "preview": "vite preview",
     "check:render": "node scripts/check-render.ts"
