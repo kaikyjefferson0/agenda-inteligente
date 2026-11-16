@@ -28,10 +28,11 @@ services:
     # Só publica um commit da main depois de o CI passar.
     autoDeployTrigger: checksPass
     # D107: CNAME api-agenda -> endereço onrender.com deste serviço (docs/deploy.md, passo 7).
-    # O endereço onrender.com continua ligado até o domínio funcionar; desligá-lo
-    # (renderSubdomainPolicy: disabled) fica para um PR seguinte (docs/deploy.md, passo 9).
+    # O endereço onrender.com fica desligado por renderSubdomainPolicy: disabled e responde 404
+    # (docs/deploy.md, passo 9).
     domains:
       - api-agenda.kaikyjefferson.dev
+    renderSubdomainPolicy: disabled
     # D114: o Render instala o uv porque há um uv.lock em backend/.
     buildCommand: uv sync --frozen --no-dev
     # D113: sem pre-deploy no plano grátis, as migrações rodam antes do uvicorn, pela conexão
@@ -98,6 +99,7 @@ services:
     # D107: CNAME agenda -> endereço onrender.com deste serviço (docs/deploy.md, passo 7).
     domains:
       - agenda.kaikyjefferson.dev
+    renderSubdomainPolicy: disabled
     # D114. O build falha se o VITE_API_BASE_URL não estiver no connect-src da CSP.
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
