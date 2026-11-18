@@ -24,9 +24,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.core.config import Settings, get_settings
+from app.core.logging import configure_app_logging
 from app.jobs.restore_demo import restore_demo
 
-logger = logging.getLogger(__name__)
+# The module's own name even under `python -m`, where __name__ is "__main__".
+logger = logging.getLogger(__spec__.name)
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 E2E_SUFFIX = "_e2e"
@@ -88,9 +90,7 @@ async def prepare(settings: Settings) -> None:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-    )
+    configure_app_logging(with_time=True)
     try:
         asyncio.run(prepare(get_settings()))
     except UnsafeDatabaseError as exc:

@@ -22,7 +22,9 @@ def closed_port_url() -> str:
     return url.render_as_string(hide_password=False)
 
 
-async def get_with_database(path: str, database_url: str) -> Response:
+async def get_with_database(
+    path: str, database_url: str, method: str = "GET"
+) -> Response:
     engine = create_async_engine(database_url, poolclass=NullPool)
 
     async def override_session():
@@ -34,7 +36,7 @@ async def get_with_database(path: str, database_url: str) -> Response:
     try:
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            return await client.get(path)
+            return await client.request(method, path)
     finally:
         app.dependency_overrides.clear()
         await engine.dispose()
@@ -63,6 +65,37 @@ async def test_ready_returns_problem_when_database_is_unavailable() -> None:
     body = response.json()
     assert body["status"] == 503
     assert body["code"] == "DATABASE_UNAVAILABLE"
+
+
+async def test_head_health_answers_ok_without_body_nor_database() -> None:
+    """Uptime monitors use HEAD: the status of the GET, no body, no query."""
+    response = await get_with_database("/health", closed_port_url(), "HEAD")
+
+    assert response.status_code == 200
+    assert response.content == b""
+
+
+@mark.parametrize(
+    ("reachable", "status_code"), [(True, 200), (False, 503)], ids=["up", "down"]
+)
+async def test_head_ready_has_the_status_of_get_without_body(
+    reachable: bool, status_code: int
+) -> None:
+    url = get_settings().database_url if reachable else closed_port_url()
+
+    head = await get_with_database("/ready", url, "HEAD")
+    get = await get_with_database("/ready", url)
+
+    assert head.status_code == get.status_code == status_code
+    assert head.content == b""
+
+
+def test_head_routes_stay_out_of_the_openapi() -> None:
+    """The frontend's openapi.json (D51) describes only the GETs."""
+    paths = app.openapi()["paths"]
+
+    assert set(paths["/health"]) == {"get"}
+    assert set(paths["/ready"]) == {"get"}
 
 
 @mark.parametrize("path", ["/health", "/docs", "/api/v1/nao-existe"])

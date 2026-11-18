@@ -19,12 +19,15 @@ from app.api.security_headers import SecurityHeadersMiddleware
 from app.api.time_blocks import router as time_blocks_router
 from app.core.config import get_settings
 from app.core.log_filters import install_customer_token_filter
+from app.core.logging import configure_app_logging
 from app.jobs.in_process import background_tasks
 
 API_PREFIX = "/api/v1"
 
 # D24: before the first request, both under uvicorn and in the tests.
 install_customer_token_filter()
+# The INFO of the worker, the restoration and the cleanup in the host's log.
+configure_app_logging()
 
 
 @asynccontextmanager

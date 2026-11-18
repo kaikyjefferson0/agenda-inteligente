@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import get_settings
 from app.core.database import get_engine
+from app.core.logging import configure_app_logging
 from app.domain.email_retry import (
     EXPIRED_ERROR,
     RESERVATION,
@@ -46,7 +47,8 @@ POLL_INTERVAL_SECONDS = 5.0
 CLEANUP_INTERVAL = ONE_DAY
 CLEANUP_RETRY = timedelta(hours=1)
 
-logger = logging.getLogger(__name__)
+# The module's own name even under `python -m`, where __name__ is "__main__".
+logger = logging.getLogger(__spec__.name)
 
 SessionFactory = async_sessionmaker[AsyncSession]
 
@@ -219,9 +221,7 @@ async def _main() -> None:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-    )
+    configure_app_logging(with_time=True)
     asyncio.run(_main())
 
 

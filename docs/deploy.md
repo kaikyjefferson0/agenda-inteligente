@@ -254,7 +254,7 @@ Depois, no Render, em **agenda-site → Settings → Custom Domains**, clique em
 ## 8. Verificar o domínio no Resend
 
 1. Em **Domains → mail.kaikyjefferson.dev**, clique em **Verify DNS Records**. Os registros de DKIM e do Return-Path ficam **Verified**, e o domínio também.
-2. A partir daqui, os e-mails da fila saem de verdade. Antes disso, o Resend recusava o envio, e a mensagem voltava para a fila com as retentativas da D39. Uma mensagem com mais de 24 horas expira.
+2. A partir daqui, os e-mails da fila saem de verdade. Antes disso, o Resend recusava o envio com `403`, e a mensagem voltava para a fila com as retentativas da D39: até 5 tentativas, a primeira na hora e as outras 1, 5, 15 e 60 minutos depois da anterior (cerca de 1h20 no total, ou mais se a API dormir no meio). Depois da quinta, ou com mais de 24 horas, a mensagem vira `failed`.
 
 **Se der errado:**
 

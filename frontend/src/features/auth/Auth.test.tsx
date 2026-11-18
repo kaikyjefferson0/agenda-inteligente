@@ -165,7 +165,11 @@ describe('protected panel (D73, D74)', () => {
     await fillLogin(user, OWNER_EMAIL, TEST_PASSWORD)
 
     await waitFor(() => expect(where(router)).toBe('/painel/expediente?dia=2026-11-10'))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Expediente' })).toBeInTheDocument()
+    // While `GET /auth/me` loads, the frame of the page already has an h1 "Expediente", which the
+    // page replaces once it answers: a findByRole on the title may return that first h1 and see it
+    // leave the document before the assertion. The description exists only on the loaded page.
+    expect(await screen.findByText(/os intervalos de atendimento de cada dia da semana/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Expediente' })).toBeInTheDocument()
   })
 
   it('never follows a return address outside the panel', async () => {

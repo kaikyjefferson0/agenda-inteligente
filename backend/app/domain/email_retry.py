@@ -17,7 +17,11 @@ RESERVATION = timedelta(minutes=5)
 MAX_AGE = timedelta(hours=24)
 MAX_ERROR_LENGTH = 200
 EXPIRED_ERROR = "expired"
-HTTP_TOO_MANY_REQUESTS = 429
+# Refusals about the account, not the message: an invalid or inactive key (401,
+# 403), a domain not verified yet or the testing-only sender (403), and the
+# rate limit (429). They pass with time or once the operator fixes the
+# configuration, with the same message.
+HTTP_RETRIED_CLIENT_ERRORS = frozenset({401, 403, 429})
 
 
 class FailureKind(StrEnum):
@@ -38,10 +42,12 @@ class GiveUp:
 def classify_http_status(status_code: int) -> FailureKind:
     """A refusal of the provider, never a success.
 
-    429 and 5xx pass with time; any other 4xx will be refused again. Anything
-    else, such as a redirect, is unexpected, so it is tried again.
+    5xx and the codes of HTTP_RETRIED_CLIENT_ERRORS pass with time or with a
+    fix of the configuration. Any other 4xx (400, 422 and the like) is about
+    the message itself and will be refused again. Anything else, such as a
+    redirect, is unexpected, so it is tried again.
     """
-    if 400 <= status_code < 500 and status_code != HTTP_TOO_MANY_REQUESTS:
+    if 400 <= status_code < 500 and status_code not in HTTP_RETRIED_CLIENT_ERRORS:
         return FailureKind.PERMANENT
     return FailureKind.TEMPORARY
 

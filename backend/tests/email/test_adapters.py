@@ -66,9 +66,9 @@ async def test_d36_resend_receives_the_message_and_the_idempotency_key() -> None
     ("status_code", "kind"),
     [
         (400, FailureKind.PERMANENT),
-        (401, FailureKind.PERMANENT),
-        (403, FailureKind.PERMANENT),
         (422, FailureKind.PERMANENT),
+        (401, FailureKind.TEMPORARY),
+        (403, FailureKind.TEMPORARY),
         (429, FailureKind.TEMPORARY),
         (500, FailureKind.TEMPORARY),
         (503, FailureKind.TEMPORARY),
