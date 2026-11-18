@@ -37,9 +37,12 @@ services:
     buildCommand: uv sync --frozen --no-dev
     # D113: sem pre-deploy no plano grátis, as migrações rodam antes do uvicorn, pela conexão
     # direta do Neon; se uma falha, a API não sobe e o Render mantém a versão anterior.
-    # uv run --no-sync usa o ambiente que o build instalou, sem conferir nem baixar dependências
-    # a cada partida a frio. 1 processo: o worker e a restauração vivem nele (D105, D106).
-    startCommand: uv run --no-sync alembic upgrade head && exec uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    # Os executáveis do backend/.venv que o build instalou, sem o uv: o runtime Python do Render
+    # exporta VIRTUAL_ENV (e põe no PATH) o próprio ambiente, na raiz do repositório, que não é o
+    # do projeto, e o uv run avisava a cada partida. O caminho é explícito porque um "alembic"
+    # solto viria daquele outro ambiente, vazio. 1 processo: o worker e a restauração vivem nele
+    # (D105, D106).
+    startCommand: .venv/bin/alembic upgrade head && exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
     # D118: /health não consulta o banco, para o Neon poder dormir. O banco é conferido no /ready.
     healthCheckPath: /health
     envVars:

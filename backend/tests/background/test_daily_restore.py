@@ -140,6 +140,8 @@ async def test_two_processes_at_once_restore_only_once(
     """D45: a deploy overlap, or a manual run, finds the check under the lock."""
     await restore(engine, settings, yesterday)
     caplog.set_level(logging.INFO)
+    # The app logs INFO from the start (app.core.logging): not the setup's run.
+    caplog.clear()
 
     first, second = await asyncio.gather(
         if_due(engine, settings, today), if_due(engine, settings, today)

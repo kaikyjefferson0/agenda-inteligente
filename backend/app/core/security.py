@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 import jwt
-from anyio import to_thread
+from anyio import CapacityLimiter, to_thread
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
@@ -13,6 +13,11 @@ ACCESS_TOKEN_TTL = timedelta(minutes=15)
 JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "agenda-inteligente"
 OPAQUE_TOKEN_BYTES = 32
+# Each Argon2 hash holds 64 MiB while it runs. The default limiter of anyio lets
+# 40 threads run at once (2.5 GiB) on an instance of 512 MB; 2 hold 128 MiB. On
+# the 0.1 CPU of the free plan simultaneous hashes only share the processor, so
+# the queue costs the last login of a burst almost nothing.
+MAX_CONCURRENT_HASHES = 2
 
 
 def build_password_hasher() -> PasswordHasher:
@@ -22,11 +27,13 @@ def build_password_hasher() -> PasswordHasher:
 
 _hasher = build_password_hasher()
 _dummy_hash: str | None = None
+# Shared by hash_password and verify_password, the dummy hash included.
+_hash_slots = CapacityLimiter(MAX_CONCURRENT_HASHES)
 
 
 async def hash_password(password: str) -> str:
     # Argon2 takes tens of milliseconds, too long for the event loop.
-    return await to_thread.run_sync(_hasher.hash, password)
+    return await to_thread.run_sync(_hasher.hash, password, limiter=_hash_slots)
 
 
 async def verify_password(stored_hash: str | None, password: str) -> bool:
@@ -42,7 +49,9 @@ async def verify_password(stored_hash: str | None, password: str) -> bool:
             _dummy_hash = await hash_password(secrets.token_urlsafe(OPAQUE_TOKEN_BYTES))
         candidate = _dummy_hash
     try:
-        await to_thread.run_sync(_hasher.verify, candidate, password)
+        await to_thread.run_sync(
+            _hasher.verify, candidate, password, limiter=_hash_slots
+        )
     except VerificationError, InvalidHashError:
         return False
     return stored_hash is not None

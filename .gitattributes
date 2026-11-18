@@ -1,0 +1,14 @@
+# LF no repositório e na cópia de trabalho, em qualquer sistema: sem os avisos
+# "LF will be replaced by CRLF" do Windows (core.autocrlf=true) e sem diffs só de
+# fim de linha. O Git decide o que é texto; os binários abaixo nunca são convertidos.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

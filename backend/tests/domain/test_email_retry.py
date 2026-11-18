@@ -51,11 +51,16 @@ def test_d39_a_permanent_failure_gives_up_at_once(attempts: int) -> None:
 @mark.parametrize(
     ("status_code", "kind"),
     [
+        # The message itself: refused again whatever happens.
         (400, FailureKind.PERMANENT),
-        (401, FailureKind.PERMANENT),
-        (403, FailureKind.PERMANENT),
+        (404, FailureKind.PERMANENT),
+        (405, FailureKind.PERMANENT),
+        (409, FailureKind.PERMANENT),
         (422, FailureKind.PERMANENT),
         (428, FailureKind.PERMANENT),
+        # The account or the configuration: the same message passes later.
+        (401, FailureKind.TEMPORARY),
+        (403, FailureKind.TEMPORARY),
         (429, FailureKind.TEMPORARY),
         (430, FailureKind.PERMANENT),
         (499, FailureKind.PERMANENT),

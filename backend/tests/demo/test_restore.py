@@ -413,6 +413,8 @@ async def test_the_logs_hold_only_counts_and_the_duration(
     caplog: LogCaptureFixture,
 ) -> None:
     await restore(engine, settings, clock.now)
+    # The app logs INFO from the start (app.core.logging): only the second run.
+    caplog.clear()
 
     with caplog.at_level(logging.INFO, logger="app.jobs.restore_demo"):
         await restore(engine, settings, clock.now)

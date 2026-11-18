@@ -124,6 +124,95 @@ async def test_ct59_a_permanent_failure_is_not_tried_again(
     assert sender.attempts == 1
 
 
+def resend_answering(*status_codes: int) -> tuple[ResendSender, list[int]]:
+    """A Resend that answers each code in turn and then accepts (200)."""
+    answers = list(status_codes)
+    calls: list[int] = []
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        code = answers.pop(0) if answers else 200
+        calls.append(code)
+        return httpx.Response(code, json={"id": "re_1"})
+
+    sender = ResendSender(
+        "chave-de-teste",
+        "Agenda <nao-responda@app.test>",
+        transport=httpx.MockTransport(handler),
+    )
+    return sender, calls
+
+
+@mark.parametrize("status_code", [400, 422])
+async def test_d39_a_refusal_of_the_message_itself_is_not_tried_again(
+    db: AsyncSession, session_factory: SessionFactory, status_code: int
+) -> None:
+    """An invalid address or field: the same message would be refused again."""
+    message = await make_message(db)
+    resend, calls = resend_answering(status_code)
+    now = worker_now()
+
+    assert await run_once(session_factory, resend, now) == 1
+
+    stored = await get_message(db, message.id)
+    assert stored.status is EmailOutboxStatus.FAILED
+    assert stored.attempts == 1
+    assert stored.last_error == f"HTTPStatusError {status_code}"
+    assert stored.payload is None
+    assert await run_once(session_factory, resend, now + timedelta(hours=2)) == 0
+    assert calls == [status_code]
+
+
+@mark.parametrize("status_code", [401, 403, 429, 500])
+async def test_d39_a_refusal_of_the_configuration_is_tried_again(
+    db: AsyncSession, session_factory: SessionFactory, status_code: int
+) -> None:
+    """A bad key or a domain not verified yet: the same message passes once the
+    operator fixes it, with the same waits as any temporary failure."""
+    message = await make_message(db)
+    resend, calls = resend_answering(status_code, status_code)
+    now = worker_now()
+
+    for attempt, delay in enumerate(RETRY_DELAYS[:2], start=1):
+        assert await run_once(session_factory, resend, now) == 1
+        stored = await get_message(db, message.id)
+        assert stored.status is EmailOutboxStatus.PENDING
+        assert stored.attempts == attempt
+        assert stored.next_attempt_at == now + delay
+        assert stored.last_error == f"HTTPStatusError {status_code}"
+        assert stored.payload is not None
+        now += delay
+
+    # Fixed: the third attempt is accepted.
+    assert await run_once(session_factory, resend, now) == 1
+    stored = await get_message(db, message.id)
+    assert stored.status is EmailOutboxStatus.SENT
+    assert stored.attempts == 3
+    assert calls == [status_code, status_code, 200]
+
+
+async def test_ct61_a_retried_message_expires_once_past_24_hours(
+    db: AsyncSession, session_factory: SessionFactory
+) -> None:
+    """Refused by a domain not verified yet and next looked at more than 24
+    hours after it was created (an instance asleep): it expires unsent."""
+    now = worker_now()
+    message = await make_message(db, created_at=now - timedelta(hours=23))
+    resend, calls = resend_answering(403)
+
+    assert await run_once(session_factory, resend, now) == 1
+    assert (await get_message(db, message.id)).status is EmailOutboxStatus.PENDING
+
+    later = now + timedelta(hours=1, seconds=1)
+    assert await run_once(session_factory, resend, later) == 1
+
+    stored = await get_message(db, message.id)
+    assert stored.status is EmailOutboxStatus.FAILED
+    assert stored.last_error == "expired"
+    assert stored.attempts == 1
+    assert stored.payload is None
+    assert calls == [403]
+
+
 async def test_ct60_a_reservation_left_by_a_dead_worker_expires(
     db: AsyncSession, session_factory: SessionFactory, sender: FakeSender
 ) -> None:

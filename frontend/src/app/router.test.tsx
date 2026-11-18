@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, type RouteObject } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -78,7 +78,10 @@ describe('router (D54)', () => {
     await withOpenSession('owner')
     renderAt(path)
 
-    expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument()
+    // Query and assertion in one callback: the frame shown while `GET /auth/me` loads has its own
+    // h1 with the same title, which the page replaces, so a node returned by findByRole may already
+    // have left the document when a separate expect runs (the flake of Auth.test.tsx).
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: title })).toBeInTheDocument())
     // The pages of the Owner join the menu once `GET /auth/me` answers.
     expect(await screen.findByRole('link', { name: title })).toHaveAttribute('aria-current', 'page')
   })

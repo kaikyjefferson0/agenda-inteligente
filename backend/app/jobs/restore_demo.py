@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings, get_settings
 from app.core.database import get_engine
+from app.core.logging import configure_app_logging
 from app.core.security import hash_password
 from app.domain.daily_jobs import restoration_due
 from app.repositories import demo
@@ -28,7 +29,8 @@ from app.services.demo_restore import (
     rebuild,
 )
 
-logger = logging.getLogger(__name__)
+# The module's own name even under `python -m`, where __name__ is "__main__".
+logger = logging.getLogger(__spec__.name)
 
 
 def _counts(counts: dict[str, int]) -> str:
@@ -117,9 +119,7 @@ async def _main() -> int:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-    )
+    configure_app_logging(with_time=True)
     raise SystemExit(asyncio.run(_main()))
 
 
