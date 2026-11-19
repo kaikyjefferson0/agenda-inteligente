@@ -32,7 +32,7 @@ Para rodar um arquivo só, por exemplo sem criar agendamento: `npm run test:smok
 
 ## O que cobre
 
-- **Itens 1 e 2:** `/health`, `/ready` e os cabeçalhos do site e da API, com `GET` (a API responde `405` ao `HEAD`).
+- **Itens 1 e 2:** `/health`, `/ready` e os cabeçalhos do site e da API, com `GET`, que traz o corpo. Desde o PR #34, a API também responde `200` ao `HEAD` em `/health` e `/ready`.
 - **Itens 4 e 5:** um agendamento pela página pública, a tela de sucesso com o link, o link aberto e o cancelamento. Cria 1 agendamento e 2 e-mails por execução, e nunca tenta de novo. Se um passo falhar, o agendamento é cancelado pela API no fim.
 - **Itens 6 e 7:** Dono pelo atalho da demo, recarregar sem perder a sessão, atributos do cookie `__Host-refresh_token`, sair; Profissional vendo só a própria agenda.
 - **Item 8:** duas abas no mesmo navegador. Sair numa encerra a outra, e a API recusa o cookie antigo.
